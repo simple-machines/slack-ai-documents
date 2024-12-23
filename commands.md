@@ -19,6 +19,10 @@ gcloud projects add-iam-policy-binding semantc-ai \
     --member="serviceAccount:vector-search-sa@semantc-ai.iam.gserviceaccount.com" \
     --role="roles/aiplatform.user"
 
+gcloud projects add-iam-policy-binding semantc-ai \
+    --member="serviceAccount:vector-search-sa@semantc-ai.iam.gserviceaccount.com" \
+    --role="roles/run.invoker"
+
 gcloud iam service-accounts keys create service-account-key.json \
     --iam-account=vector-search-sa@semantc-ai.iam.gserviceaccount.com
 ```
