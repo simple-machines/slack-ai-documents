@@ -1,0 +1,10 @@
+google-cloud-aiplatform==1.36.0
+google-cloud-storage==2.10.0
+vertexai==0.0.1  
+fastapi==0.103.1
+uvicorn==0.23.2
+faiss-cpu==1.7.4
+numpy==1.24.3
+tqdm==4.66.1
+langchain==0.0.352
+langchain-google-community==0.0.7
