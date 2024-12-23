@@ -32,3 +32,5 @@ venv/
 *.faiss
 *.index
 *.bin
+
+service-account-key.json
