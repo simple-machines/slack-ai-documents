@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>House Advertisement App</title>
+</head>
+<body>
+    <h1>Create House Advertisement</h1>
+    <form id="houseForm">
+        <label for="address">Address:</label><br>
+        <input type="text" id="address" name="address"><br>
+        <label for="bedrooms">Bedrooms:</label><br>
+        <input type="number" id="bedrooms" name="bedrooms"><br>
+        <label for="price">Price:</label><br>
+        <input type="number" id="price" name="price"><br>
+        <label for="description">Description:</label><br>
+        <textarea id="description" name="description"></textarea><br>
+        <button type="submit">Create Advertisement</button>
+    </form>
+
+    <h2>Search for Houses</h2>
+    <form id="searchForm">
+        <label for="searchQuery">Search Query:</label><br>
+        <input type="text" id="searchQuery" name="searchQuery"><br>
+        <button type="submit">Search</button>
+    </form>
+
+    <div id="searchResults"></div>
+
+    <script>
+        const houseForm = document.getElementById('houseForm');
+        const searchForm = document.getElementById('searchForm');
+        const searchResultsDiv = document.getElementById('searchResults');
+
+        houseForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formData = new FormData(houseForm);
+            const data = Object.fromEntries(formData.entries());
+            try {
+                const response = await fetch('/documents/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                if (response.ok) {
+                    alert('Advertisement created successfully!');
+                    houseForm.reset();
+                } else {
+                    alert('Error creating advertisement.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred.');
+            }
+        });
+
+        searchForm.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const formData = new FormData(searchForm);
+            const query = formData.get('searchQuery');
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+                if (response.ok) {
+                    const results = await response.json();
+                    displaySearchResults(results);
+                } else {
+                    alert('Error searching for houses.');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An error occurred.');
+            }
+        });
+
+        function displaySearchResults(results) {
+            searchResultsDiv.innerHTML = '';
+            if (results.length === 0) {
+                searchResultsDiv.innerHTML = '<p>No results found.</p>';
+                return;
+            }
+            results.forEach(result => {
+                const resultDiv = document.createElement('div');
+                resultDiv.innerHTML = `
+                    <h3>${result.metadata.filename}</h3>
+                    <p><strong>Address:</strong> ${result.metadata.address}</p>
+                    <p><strong>Bedrooms:</strong> ${result.metadata.bedrooms}</p>
+                    <p><strong>Price:</strong> ${result.metadata.price}</p>
+                    <p><strong>Description:</strong> ${result.text}</p>
+                    <p><strong>Score:</strong> ${result.score}</p>
+                `;
+                searchResultsDiv.appendChild(resultDiv);
+            });
+        }
+    </script>
+</body>
+</html>
