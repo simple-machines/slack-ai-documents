@@ -1,3 +1,9 @@
+```
+export PROJECT_ID=semantc-ai
+export LOCATION=us-central1
+export BUCKET_NAME=slack-ai-vector-search
+```
+
 <!-- # create and configure gcs bucket
 gsutil mb -l us-central1 gs://slack-ai-vector-search -->
 
@@ -17,8 +23,13 @@ gcloud iam service-accounts keys create service-account-key.json \
     --iam-account=vector-search-sa@semantc-ai.iam.gserviceaccount.com
 ```
 
-# run processing script
-python scripts/process_documents.py --input-dir ./documents
+# create a new repository in artifact registry
+```
+gcloud artifacts repositories create vector-search \
+    --repository-format=docker \
+    --location=us-central1 \
+    --description="Repository for Vector Search service"
+```
 
 
 # run everything locally using Docker:

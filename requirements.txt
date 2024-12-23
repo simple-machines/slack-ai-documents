@@ -11,3 +11,4 @@ langchain-google-community
 python-multipart
 scikit-learn
 PyPDF2
+slack-sdk
