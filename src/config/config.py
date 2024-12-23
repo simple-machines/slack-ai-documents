@@ -1,25 +1,28 @@
 # src/config/config.py
 
 import os
-from pathlib import Path
 
-# project configuration
+# Google Cloud settings
 PROJECT_ID = os.getenv("PROJECT_ID")
-LOCATION = os.getenv("LOCATION", "us-central1")  
+LOCATION = os.getenv("LOCATION", "us-central1")
 BUCKET_NAME = os.getenv("BUCKET_NAME")
 
-# vertex ai configuration 
+# Vertex AI models
 EMBEDDING_MODEL = "textembedding-gecko@003"
 GEMINI_MODEL = "gemini-1.0-pro-001"
 
-# faiss configuration
+# storage paths
 INDEX_BLOB_PATH = "indexes/faiss_index.bin"
 METADATA_BLOB_PATH = "indexes/metadata.json"
+DOCUMENTS_PREFIX = "documents/"
 
 # document processing
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 
-# search configuration  
+# search settings
 TOP_K = 5
-SEMANTIC_WEIGHT = 0.7  # weight for semantic search vs keyword
+HYBRID_ALPHA = 0.7  # weight for semantic vs keyword search
+
+# API settings
+MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10MB in bytes
