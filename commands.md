@@ -25,10 +25,6 @@ gcloud iam service-accounts keys create service-account-key.json \
     --iam-account=vector-search-sa@semantc-ai.iam.gserviceaccount.com
 ```
 
-# run processing script
-python scripts/process_documents.py --input-dir ./documents
-
-
 # run locally using Docker:
 ```
 docker-compose up --build
@@ -37,7 +33,7 @@ docker-compose up --build
 ```
 docker-compose run --rm vector-search python scripts/process_documents.py --input-dir /app/documents
 ```
-
+# run search locally:
 ```
 http://localhost:8080/docs#/default/upload_document_documents__post
 ```

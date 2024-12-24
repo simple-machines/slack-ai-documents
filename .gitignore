@@ -34,3 +34,4 @@ venv/
 *.bin
 
 service-account-key.json
+commands.md
