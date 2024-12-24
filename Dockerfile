@@ -13,19 +13,28 @@ RUN mkdir -p /tmp/keys
 # Copy requirements and setup files first
 COPY requirements.txt setup.py ./
 
-# Install dependencies and package
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install -e .
 
 # Copy application code
 COPY . .
 
-# Use environment variable for port
+# Environment variables
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
-ENV GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/sa-key.json
+ENV PYTHONPATH=/app
 
+# Make sure the application doesn't run as root
+RUN useradd -m myuser
+USER myuser
+
+# Expose port
 EXPOSE ${PORT}
 
-# Use Python to run uvicorn directly
-CMD ["python", "-m", "uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8080"]
+# Health check
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/health || exit 1
+
+# Run FastAPI with uvicorn
+CMD ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1", "--timeout-keep-alive", "75"]

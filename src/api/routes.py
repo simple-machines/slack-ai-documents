@@ -4,9 +4,9 @@ from fastapi import APIRouter, HTTPException, File, UploadFile
 from pydantic import BaseModel
 from typing import List, Optional
 
-from ..indexer import DocumentProcessor
-from ..search.hybrid_searcher import HybridSearcher
-from ..config import TOP_K, PROJECT_ID, LOCATION
+from src.indexer import DocumentProcessor
+from src.search.hybrid_searcher import HybridSearcher
+from src.config import TOP_K, PROJECT_ID, LOCATION
 
 router = APIRouter()
 doc_processor = DocumentProcessor(PROJECT_ID, LOCATION)

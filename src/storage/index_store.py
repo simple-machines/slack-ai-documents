@@ -7,8 +7,8 @@ import tempfile
 from pathlib import Path
 from typing import Dict, Optional, Tuple
 
-from .gcs import GCSHandler
-from ..config import BUCKET_NAME, INDEX_BLOB_PATH, METADATA_BLOB_PATH
+from src.config import BUCKET_NAME, INDEX_BLOB_PATH, METADATA_BLOB_PATH
+from src.storage.gcs import GCSHandler
 
 class IndexStore:
     def __init__(self):

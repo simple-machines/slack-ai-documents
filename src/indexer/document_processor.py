@@ -2,9 +2,10 @@
 
 from typing import List, Dict
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from .embeddings import EmbeddingGenerator
-from .index_builder import IndexBuilder
-from ..config import CHUNK_SIZE, CHUNK_OVERLAP
+
+from src.config import CHUNK_SIZE, CHUNK_OVERLAP
+from src.indexer.embeddings import EmbeddingGenerator
+from src.indexer.index_builder import IndexBuilder
 
 class DocumentProcessor:
     def __init__(self, project_id: str, location: str):

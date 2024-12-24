@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from . import routes
 from . import slack_handler
 
+<<<<<<< HEAD
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -13,6 +14,18 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
+=======
+from fastapi import FastAPI, HTTPException, UploadFile, File
+from pydantic import BaseModel
+from typing import List, Optional
+import vertexai
+from vertexai.language_models import TextEmbeddingModel
+import numpy as np
+
+from src.storage import IndexStore
+from src.indexer import DocumentProcessor
+from src.config import PROJECT_ID, LOCATION, TOP_K
+>>>>>>> main
 
 app = FastAPI(title="Vector Search Service")
 
