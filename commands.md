@@ -7,7 +7,9 @@ export SLACK_SIGNING_SECRET=650ed9fcc0f1611c5371cc361fc7b283
 ```
 
 # create and configure gcs bucket
+```
 gsutil mb -l us-central1 gs://slack-ai-vector-search
+```
 
 # create service account and download key
 ```
