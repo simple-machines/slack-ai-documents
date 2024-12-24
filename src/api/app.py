@@ -7,9 +7,9 @@ import vertexai
 from vertexai.language_models import TextEmbeddingModel
 import numpy as np
 
-from ..storage import IndexStore
-from ..indexer import DocumentProcessor
-from ..config import PROJECT_ID, LOCATION, TOP_K
+from src.storage import IndexStore
+from src.indexer import DocumentProcessor
+from src.config import PROJECT_ID, LOCATION, TOP_K
 
 app = FastAPI(title="Vector Search Service")
 

@@ -3,9 +3,10 @@
 from typing import List, Dict
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
-from ..storage import IndexStore
-from ..indexer.embeddings import EmbeddingGenerator
-from ..config import PROJECT_ID, LOCATION, HYBRID_ALPHA
+
+from src.storage import IndexStore
+from src.indexer.embeddings import EmbeddingGenerator
+from src.config import PROJECT_ID, LOCATION, HYBRID_ALPHA
 
 class HybridSearcher:
     def __init__(self):

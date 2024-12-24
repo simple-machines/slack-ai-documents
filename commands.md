@@ -1,3 +1,7 @@
+export PROJECT_ID=semantc-ai
+export LOCATION=us-central1
+export BUCKET_NAME=slack-ai-vector-search
+
 <!-- # create and configure gcs bucket
 gsutil mb -l us-central1 gs://slack-ai-vector-search -->
 
@@ -36,3 +40,17 @@ http://localhost:8080/docs#/default/upload_document_documents__post
 # build and deploy to Cloud Run
 chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
+
+
+
+### TEST LOCALLY!
+# make sure your service-account-key.json is in your project root
+docker build -t vector-search .
+
+# Run with service account mounted
+docker run -p 8080:8080 \
+  -e PROJECT_ID=${PROJECT_ID} \
+  -e BUCKET_NAME=${BUCKET_NAME} \
+  -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/sa-key.json \
+  -v ${PWD}/service-account-key.json:/tmp/keys/sa-key.json:ro \
+  vector-search

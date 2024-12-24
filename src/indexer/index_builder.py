@@ -3,9 +3,10 @@
 import faiss
 import numpy as np
 from typing import List, Dict
-from ..storage import IndexStore
-from .embeddings import EmbeddingGenerator
-from ..config import PROJECT_ID, LOCATION
+
+from src.storage import IndexStore
+from src.indexer.embeddings import EmbeddingGenerator
+from src.config import PROJECT_ID, LOCATION
 
 class IndexBuilder:
     def __init__(self):
