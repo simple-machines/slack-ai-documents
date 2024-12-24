@@ -2,6 +2,8 @@
 export PROJECT_ID=semantc-ai
 export LOCATION=us-central1
 export BUCKET_NAME=slack-ai-vector-search
+export SLACK_BOT_TOKEN=xoxb-
+export SLACK_SIGNING_SECRET=
 ```
 
 # create and configure gcs bucket
@@ -41,8 +43,13 @@ http://localhost:8080/docs#/default/upload_document_documents__post
 
 # build and deploy to Cloud Run
 chmod +x scripts/deploy.sh
+
 ./scripts/deploy.sh
 
+```
+source .env
+./scripts/deploy.sh
+```
 
 
 ### TEST LOCALLY!

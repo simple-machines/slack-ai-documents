@@ -26,3 +26,10 @@ HYBRID_ALPHA = 0.7  # weight for semantic vs keyword search
 
 # API settings
 MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10MB in bytes
+
+# Slack settings
+SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
+SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
+SLACK_MAX_RESULTS = 5
+SLACK_RESULT_CHUNK_SIZE = 300  # max characters per result chunk
+SLACK_RATE_LIMIT = 20  # requests per minute

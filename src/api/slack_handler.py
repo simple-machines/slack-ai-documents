@@ -4,97 +4,138 @@ from fastapi import APIRouter, Request, HTTPException
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 import json
-import os
+import logging
 from typing import Dict
 
 from ..search.hybrid_searcher import HybridSearcher
-from ..config import TOP_K
+from ..config import SLACK_BOT_TOKEN, TOP_K
+from ..utils.slack_utils import verify_slack_request, format_search_results, extract_query
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
+
+# Initialize searcher and Slack client
 searcher = HybridSearcher()
-
-# initialize slack client
-slack_token = os.getenv("SLACK_BOT_TOKEN")
-client = WebClient(token=slack_token)
-
-def verify_slack_request(request: Request) -> bool:
-    """verify the request is coming from Slack"""
-    # in production, implement Slack signature verification here
-    return True
-
-def format_search_results(results: list) -> str:
-    """format search results for Slack message"""
-    if not results:
-        return "No results found."
-    
-    formatted_results = []
-    for i, result in enumerate(results, 1):
-        formatted_results.append(
-            f"*{i}.* Score: {result['score']:.2f}\n"
-            f"```{result['text'][:300]}...```\n"
-            f"Source: {result['metadata'].get('filename', 'Unknown')}\n"
-        )
-    
-    return "\n".join(formatted_results)
+if not SLACK_BOT_TOKEN:
+    raise ValueError("SLACK_BOT_TOKEN must be set")
+client = WebClient(token=SLACK_BOT_TOKEN)
 
 @router.post("/slack/events")
 async def handle_slack_events(request: Request):
-    """handle Slack events API"""
-    body = await request.body()
-    event_data = json.loads(body)
+    """Handle Slack events API"""
+    try:
+        body = await request.body()
+        event_data = json.loads(body)
+        
+        # Log incoming event
+        logger.info("Received Slack event", extra={
+            "event_type": event_data.get("type"),
+            "team_id": event_data.get("team_id"),
+            "api_app_id": event_data.get("api_app_id")
+        })
+        
+        # Handle URL verification
+        if event_data.get("type") == "url_verification":
+            return {"challenge": event_data.get("challenge")}
+
+        # Verify request
+        await verify_slack_request(request)
+
+        event = event_data.get("event", {})
+        if event.get("type") == "app_mention":
+            return await handle_mention(event)
+        
+        return {"ok": True}
     
-    # handle url verification
-    if event_data.get("type") == "url_verification":
-        return {"challenge": event_data.get("challenge")}
+    except Exception as e:
+        logger.error("Error handling Slack event", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
-    if not verify_slack_request(request):
-        raise HTTPException(status_code=401, detail="Invalid request")
-
-    event = event_data.get("event", {})
-    if event.get("type") == "app_mention":
+async def handle_mention(event: Dict):
+    """Handle app mention events"""
+    try:
         channel = event.get("channel")
-        text = event.get("text")
+        text = event.get("text", "")
+        user = event.get("user")
+        thread_ts = event.get("thread_ts", event.get("ts"))
         
-        # remove the bot mention from the query
-        query = text.split(">", 1)[1].strip() if ">" in text else text
+        logger.info("Processing app mention", extra={
+            "channel": channel,
+            "user": user,
+            "text_length": len(text)
+        })
         
-        try:
-            # perform search
-            results = searcher.search(query, TOP_K)
-            
-            # format and send response
-            response = format_search_results(results)
+        # Extract query from mention
+        query = extract_query(text)
+        if not query:
             client.chat_postMessage(
                 channel=channel,
-                text=f"Results for: *{query}*\n\n{response}"
+                thread_ts=thread_ts,
+                text="Please provide a search query! 🔍"
             )
-        except Exception as e:
-            client.chat_postMessage(
-                channel=channel,
-                text=f"sorry, I encountered an error: {str(e)}"
-            )
-    
-    return {"ok": True}
+            return {"ok": True}
+        
+        # Perform search
+        results = searcher.search(query, TOP_K)
+        
+        # Format and send response
+        response = format_search_results(results, query, thread_ts)
+        client.chat_postMessage(
+            channel=channel,
+            **response
+        )
+        
+        logger.info("Search results sent", extra={
+            "channel": channel,
+            "num_results": len(results)
+        })
+        
+        return {"ok": True}
+        
+    except SlackApiError as e:
+        logger.error("Slack API error", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logger.error("Error handling mention", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/slack/commands")
 async def handle_slack_commands(request: Request):
-    """handle Slack slash commands"""
-    form_data = await request.form()
-    command = form_data.get("command")
-    text = form_data.get("text")
-    
-    if command == "/search":
-        try:
+    """Handle Slack slash commands"""
+    try:
+        await verify_slack_request(request)
+        
+        form_data = await request.form()
+        command = form_data.get("command")
+        text = form_data.get("text", "").strip()
+        channel_id = form_data.get("channel_id")
+        user_id = form_data.get("user_id")
+        thread_ts = form_data.get("thread_ts")
+        
+        logger.info("Received slash command", extra={
+            "command": command,
+            "channel": channel_id,
+            "user": user_id
+        })
+        
+        if command == "/find":  # Changed from /search to /find
+            if not text:
+                return {
+                    "response_type": "ephemeral",
+                    "text": "Please provide a search query! Usage: `/find your query here`"
+                }
+            
             results = searcher.search(text, TOP_K)
-            response = format_search_results(results)
-            return {
-                "response_type": "in_channel",
-                "text": f"Results for: *{text}*\n\n{response}"
-            }
-        except Exception as e:
-            return {
-                "response_type": "ephemeral",
-                "text": f"sorry, I encountered an error: {str(e)}"
-            }
-    
-    return {"text": "Unknown command"}
+            return format_search_results(results, text, thread_ts)
+            
+        return {
+            "response_type": "ephemeral",
+            "text": "Unknown command"
+        }
+        
+    except Exception as e:
+        logger.error("Error handling slash command", exc_info=True)
+        return {
+            "response_type": "ephemeral",
+            "text": f"Sorry, I encountered an error: {str(e)}"
+        }

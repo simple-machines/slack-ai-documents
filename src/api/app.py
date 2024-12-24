@@ -1,12 +1,13 @@
 # src/api/app.py
+
 import os
 import logging
 import sys
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from . import routes
 from . import slack_handler
 
-<<<<<<< HEAD
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -14,53 +15,71 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 logger = logging.getLogger(__name__)
-=======
-from fastapi import FastAPI, HTTPException, UploadFile, File
-from pydantic import BaseModel
-from typing import List, Optional
-import vertexai
-from vertexai.language_models import TextEmbeddingModel
-import numpy as np
 
-from src.storage import IndexStore
-from src.indexer import DocumentProcessor
-from src.config import PROJECT_ID, LOCATION, TOP_K
->>>>>>> main
+# Initialize FastAPI app
+app = FastAPI(
+    title="Vector Search Service",
+    description="API for semantic search with Slack integration",
+    version="1.0.0"
+)
 
-app = FastAPI(title="Vector Search Service")
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.on_event("startup")
 async def startup_event():
     """Run startup tasks"""
     try:
         logger.info("Starting application...")
-        # Log environment variables (excluding sensitive ones)
-        logger.info(f"PROJECT_ID: {os.getenv('PROJECT_ID')}")
-        logger.info(f"BUCKET_NAME: {os.getenv('BUCKET_NAME')}")
-        logger.info(f"PORT: {os.getenv('PORT')}")
-        logger.info(f"GOOGLE_APPLICATION_CREDENTIALS: {os.getenv('GOOGLE_APPLICATION_CREDENTIALS')}")
+        
+        # Log non-sensitive environment variables
+        env_vars = {
+            "PROJECT_ID": os.getenv("PROJECT_ID"),
+            "BUCKET_NAME": os.getenv("BUCKET_NAME"),
+            "PORT": os.getenv("PORT"),
+            "LOCATION": os.getenv("LOCATION")
+        }
+        logger.info("Environment variables: %s", {k: v for k, v in env_vars.items() if v is not None})
+        
+        # Check required environment variables
+        required_vars = ["PROJECT_ID", "BUCKET_NAME", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
+        if missing_vars:
+            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
         
         # Include routers
         logger.info("Including routers...")
-        app.include_router(routes.router)
-        app.include_router(slack_handler.router)
+        app.include_router(routes.router, tags=["Search"])
+        app.include_router(slack_handler.router, tags=["Slack"])
         
         logger.info("Application startup complete")
+        
     except Exception as e:
-        logger.error(f"Error during startup: {str(e)}", exc_info=True)
+        logger.error("Error during startup: %s", str(e), exc_info=True)
         raise
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "env": os.getenv("ENV", "production")
+    }
 
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8080"))
-    logger.info(f"Starting uvicorn server on port {port}")
+    logger.info("Starting uvicorn server on port %d", port)
     uvicorn.run(
-        "src.api.app:app", 
-        host="0.0.0.0", 
+        "src.api.app:app",
+        host="0.0.0.0",
         port=port,
         log_level="info",
         access_log=True
