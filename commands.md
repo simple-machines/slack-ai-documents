@@ -2,8 +2,8 @@
 export PROJECT_ID=semantc-ai
 export LOCATION=us-central1
 export BUCKET_NAME=slack-ai-vector-search
-export SLACK_BOT_TOKEN=xoxb-
-export SLACK_SIGNING_SECRET=
+export SLACK_BOT_TOKEN=xoxb-8082366857367-8212695584051-p2grHtBQCMwhxSFYZM2BPHLV
+export SLACK_SIGNING_SECRET=650ed9fcc0f1611c5371cc361fc7b283
 ```
 
 # create and configure gcs bucket
@@ -29,10 +29,11 @@ gcloud iam service-accounts keys create service-account-key.json \
 python scripts/process_documents.py --input-dir ./documents
 
 
-# run everything locally using Docker:
+# run locally using Docker:
 ```
 docker-compose up --build
 ```
+# process docuemnt:
 ```
 docker-compose run --rm vector-search python scripts/process_documents.py --input-dir /app/documents
 ```
@@ -42,12 +43,8 @@ http://localhost:8080/docs#/default/upload_document_documents__post
 ```
 
 # build and deploy to Cloud Run
-chmod +x scripts/deploy.sh
-
-./scripts/deploy.sh
-
 ```
-source .env
+chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
 ```
 
@@ -57,9 +54,9 @@ source .env
 docker build -t vector-search .
 
 # Run with service account mounted
-docker run -p 8080:8080 \
+<!-- docker run -p 8080:8080 \
   -e PROJECT_ID=${PROJECT_ID} \
   -e BUCKET_NAME=${BUCKET_NAME} \
   -e GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/sa-key.json \
   -v ${PWD}/service-account-key.json:/tmp/keys/sa-key.json:ro \
-  vector-search
+  vector-search -->
