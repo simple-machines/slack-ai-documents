@@ -63,7 +63,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     # add each result as a separate section block
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
         explanation = result['metadata'].get('relevance_explanation', 'No explanation provided.')
-        text = result['text']
+        text = result['text'].replace('\n', ' ')  # Replace newline characters with spaces
         score = result['score']
         metadata = result['metadata']
 

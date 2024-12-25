@@ -41,7 +41,8 @@ class GeminiSearcher:
 
     async def search(self, query: str) -> List[Dict]:
         """
-        search through documents using Gemini, returning results until the relevance threshold is met.
+        search through documents using Gemini, returning results until the relevance threshold is met,
+        considering only results with an individual score of 0.80 or higher.
 
         args:
             query: search query string
@@ -115,12 +116,18 @@ class GeminiSearcher:
                     if not isinstance(results, list):
                         logger.error(f"unexpected response format: {response.text}")
                         return []
-                    logger.info(f"raw Gemini results with scores: {[res.get('score') for res in results]}")
+
+                    # Log the scores of the raw results for debugging
+                    logger.info(f"Raw Gemini results with scores: {[res.get('score') for res in results]}")
+
+                    # Filter results by individual score >= 0.80
+                    filtered_results = [result for result in results if result.get('score', 0) >= 0.80]
+                    logger.info(f"Filtered Gemini results (score >= 0.80): {[res.get('score') for res in filtered_results]}")
 
                     # format results and apply top_p logic
                     formatted_results = []
                     cumulative_score = 0.0
-                    for result in sorted(results, key=lambda x: x.get('score', 0), reverse=True):
+                    for result in sorted(filtered_results, key=lambda x: x.get('score', 0), reverse=True):
                         score = float(result.get('score', 0))
                         if cumulative_score + score <= TOP_P_THRESHOLD:
                             formatted_results.append({
