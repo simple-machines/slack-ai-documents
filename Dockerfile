@@ -7,8 +7,10 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Create directory for service account key
-RUN mkdir -p /tmp/keys
+# Create directory for service account key and ensure /tmp is writable
+RUN mkdir -p /tmp/keys && \
+    chmod 777 /tmp && \
+    chmod 777 /tmp/keys
 
 # Copy requirements and setup files first
 COPY requirements.txt setup.py ./
@@ -25,8 +27,11 @@ ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
-# Make sure the application doesn't run as root
-RUN useradd -m myuser
+# Create non-root user and set permissions
+RUN useradd -m myuser && \
+    chown -R myuser:myuser /app && \
+    chown -R myuser:myuser /tmp
+
 USER myuser
 
 # Expose port

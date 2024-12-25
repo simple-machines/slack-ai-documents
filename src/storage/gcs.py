@@ -3,58 +3,139 @@
 import json
 import tempfile
 from pathlib import Path
-from typing import Optional, Union, BinaryIO
+from typing import Optional, Union, BinaryIO, List
+import logging
 from google.cloud import storage
 from google.cloud.storage.blob import Blob
 from google.cloud.storage.bucket import Bucket
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
+logger = logging.getLogger(__name__)
 
 class GCSHandler:
     def __init__(self, bucket_name: str):
         """initialize GCS client and get bucket reference"""
         self.client = storage.Client()
         self.bucket: Bucket = self.client.bucket(bucket_name)
+        self._executor = ThreadPoolExecutor(max_workers=5)
 
-    def upload_file(self, source_file: Union[str, Path], destination_blob_name: str) -> None:
+    async def upload_file(self, source_file: Union[str, Path], destination_blob_name: str) -> None:
         """upload a file to GCS bucket"""
-        blob: Blob = self.bucket.blob(destination_blob_name)
-        blob.upload_from_filename(str(source_file))
+        try:
+            blob: Blob = self.bucket.blob(destination_blob_name)
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                self._executor,
+                blob.upload_from_filename,
+                str(source_file)
+            )
+        except Exception as e:
+            logger.error(f"Error uploading file to GCS: {str(e)}")
+            raise
 
-    def download_file(self, source_blob_name: str, destination_file: Union[str, Path]) -> None:
+    async def download_file(self, source_blob_name: str, destination_file: Union[str, Path]) -> None:
         """download a file from GCS bucket"""
-        blob: Blob = self.bucket.blob(source_blob_name)
-        blob.download_to_filename(str(destination_file))
+        try:
+            blob: Blob = self.bucket.blob(source_blob_name)
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                self._executor,
+                blob.download_to_filename,
+                str(destination_file)
+            )
+        except Exception as e:
+            logger.error(f"Error downloading file from GCS: {str(e)}")
+            raise
 
-    def upload_from_string(self, data: str, destination_blob_name: str) -> None:
+    async def upload_from_string(self, data: str, destination_blob_name: str) -> None:
         """upload string data to GCS bucket"""
-        blob: Blob = self.bucket.blob(destination_blob_name)
-        blob.upload_from_string(data)
+        try:
+            blob: Blob = self.bucket.blob(destination_blob_name)
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                self._executor,
+                blob.upload_from_string,
+                data
+            )
+        except Exception as e:
+            logger.error(f"Error uploading string to GCS: {str(e)}")
+            raise
 
-    def download_as_string(self, source_blob_name: str) -> str:
+    async def download_as_string(self, source_blob_name: str) -> str:
         """download and return file contents as string"""
-        blob: Blob = self.bucket.blob(source_blob_name)
-        return blob.download_as_string().decode("utf-8")
+        try:
+            blob: Blob = self.bucket.blob(source_blob_name)
+            loop = asyncio.get_running_loop()
+            content = await loop.run_in_executor(
+                self._executor,
+                blob.download_as_string
+            )
+            return content.decode("utf-8")
+        except Exception as e:
+            logger.error(f"Error downloading string from GCS: {str(e)}")
+            raise
 
-    def upload_json(self, data: dict, destination_blob_name: str) -> None:
+    async def upload_json(self, data: dict, destination_blob_name: str) -> None:
         """upload dictionary as JSON to GCS bucket"""
-        json_str = json.dumps(data)
-        self.upload_from_string(json_str, destination_blob_name)
+        try:
+            json_str = json.dumps(data, indent=2)
+            await self.upload_from_string(json_str, destination_blob_name)
+        except Exception as e:
+            logger.error(f"Error uploading JSON to GCS: {str(e)}")
+            raise
 
-    def download_json(self, source_blob_name: str) -> dict:
+    async def download_json(self, source_blob_name: str) -> dict:
         """download and parse JSON file from GCS bucket"""
-        content = self.download_as_string(source_blob_name)
-        return json.loads(content)
+        try:
+            content = await self.download_as_string(source_blob_name)
+            return json.loads(content)
+        except Exception as e:
+            logger.error(f"Error downloading JSON from GCS: {str(e)}")
+            raise
 
-    def list_files(self, prefix: Optional[str] = None) -> list[str]:
+    async def list_files(self, prefix: Optional[str] = None) -> List[str]:
         """list all files in bucket with optional prefix"""
-        blobs = self.client.list_blobs(self.bucket, prefix=prefix)
-        return [blob.name for blob in blobs]
+        try:
+            loop = asyncio.get_running_loop()
+            blobs = await loop.run_in_executor(
+                self._executor,
+                lambda: list(self.client.list_blobs(self.bucket, prefix=prefix))
+            )
+            return [blob.name for blob in blobs]
+        except Exception as e:
+            logger.error(f"Error listing files in GCS: {str(e)}")
+            raise
 
-    def file_exists(self, blob_name: str) -> bool:
+    async def file_exists(self, blob_name: str) -> bool:
         """check if file exists in bucket"""
-        blob = self.bucket.blob(blob_name)
-        return blob.exists()
+        try:
+            blob = self.bucket.blob(blob_name)
+            loop = asyncio.get_running_loop()
+            exists = await loop.run_in_executor(
+                self._executor,
+                blob.exists
+            )
+            return exists
+        except Exception as e:
+            logger.error(f"Error checking file existence in GCS: {str(e)}")
+            raise
 
-    def delete_file(self, blob_name: str) -> None:
-        """delete a file from bucket"""
-        blob = self.bucket.blob(blob_name)
-        blob.delete()
+    def __del__(self):
+        """Cleanup executor on deletion"""
+        if hasattr(self, '_executor'):
+            self._executor.shutdown(wait=False)
+
+    async def download_as_bytes(self, source_blob_name: str) -> bytes:
+        """Download and return file contents as bytes"""
+        try:
+            blob: Blob = self.bucket.blob(source_blob_name)
+            loop = asyncio.get_running_loop()
+            content = await loop.run_in_executor(
+                self._executor,
+                blob.download_as_bytes
+            )
+            return content
+        except Exception as e:
+            logger.error(f"Error downloading bytes from GCS: {str(e)}")
+            raise

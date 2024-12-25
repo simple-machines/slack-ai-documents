@@ -5,15 +5,28 @@ from pydantic import BaseModel, Field
 from typing import List, Optional
 import logging
 
-from src.indexer import DocumentProcessor
-from src.search.hybrid_searcher import HybridSearcher
+from src.processor.gemini_processor import GeminiProcessor
+from src.search.gemini_searcher import GeminiSearcher
 from src.config import TOP_K, PROJECT_ID, LOCATION
 
 router = APIRouter(tags=["API"])
 logger = logging.getLogger(__name__)
 
-doc_processor = DocumentProcessor(PROJECT_ID, LOCATION)
-searcher = HybridSearcher()
+# Lazy initialization of processors
+_doc_processor = None
+_searcher = None
+
+def get_doc_processor():
+    global _doc_processor
+    if _doc_processor is None:
+        _doc_processor = GeminiProcessor()
+    return _doc_processor
+
+def get_searcher():
+    global _searcher
+    if _searcher is None:
+        _searcher = GeminiSearcher()
+    return _searcher
 
 class SearchQuery(BaseModel):
     """Schema for search query"""
@@ -28,7 +41,7 @@ class SearchResult(BaseModel):
 
 @router.post("/find", response_model=List[SearchResult], 
             summary="Search documents",
-            description="Search through indexed documents using a text query")
+            description="Search through documents using Gemini")
 async def find(query: SearchQuery):
     """
     Search endpoint that returns relevant documents based on the query text.
@@ -41,7 +54,8 @@ async def find(query: SearchQuery):
     """
     try:
         logger.info(f"Searching with query: {query.query}")
-        results = searcher.search(query.query, query.top_k)
+        searcher = get_searcher()
+        results = await searcher.search(query.query, query.top_k)
         
         formatted_results = [
             SearchResult(
@@ -61,32 +75,40 @@ async def find(query: SearchQuery):
 
 @router.post("/documents",
             summary="Upload document",
-            description="Upload a document to be indexed for searching")
+            description="Upload and process a document using Gemini")
 async def upload_document(
     file: UploadFile = File(..., description="The document file to upload")
 ):
     """
-    Upload and process a document for indexing.
+    Upload and process a document.
     
     Args:
         file (UploadFile): The document file to process
         
     Returns:
-        dict: Success message
+        dict: Success message with analysis
     """
     try:
         logger.info(f"Processing document: {file.filename}")
-        contents = await file.read()
         
-        doc_processor.process_and_index_document(
-            content=contents.decode(),
+        # Save uploaded file temporarily
+        temp_path = f"/tmp/{file.filename}"
+        with open(temp_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Process with Gemini
+        processor = get_doc_processor()
+        result = await processor.process_document(
+            temp_path,
             metadata={"filename": file.filename}
         )
         
         logger.info(f"Successfully processed document: {file.filename}")
         return {
             "message": "Document processed successfully",
-            "filename": file.filename
+            "filename": file.filename,
+            "analysis": result["analysis"]
         }
         
     except Exception as e:

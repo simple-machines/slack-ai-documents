@@ -3,22 +3,36 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="vector-search",
-    version="0.1.0",
+    name="gemini-search",  # Updated name to reflect new architecture
+    version="0.2.0",      # Bumped version
     packages=find_packages(),
     install_requires=[
+        # core google cloud
+        'google-cloud-storage',
+        'google-cloud-aiplatform',
+        'google-generativeai>=0.3.0',
+        
+        # fastapi and web
         'fastapi',
         'uvicorn',
-        'google-cloud-storage',
-        'faiss-cpu',
-        'vertexai',
+        'python-multipart',
+        'requests',
+        
+        # pdf processing
+        'PyPDF2',
+        
+        # utilities
         'python-dotenv',
         'tqdm',
-        'numpy',  # required for FAISS and vector operations
-        'scikit-learn',  # required for TfidfVectorizer in hybrid_searcher.py
-        'python-multipart',  # required for FastAPI file uploads
-        'langchain-text-splitters',  # required for document processing
-        'pydantic',  # required for FastAPI models
+        
+        # slack integration
+        'slack-sdk',
+        
+        # type checking and api models
+        'pydantic',
+        
+        # async support
+        'aiofiles',
     ],
-    python_requires='>=3.9',  # since you're using Python 3.9 in Dockerfile
+    python_requires='>=3.9',
 )

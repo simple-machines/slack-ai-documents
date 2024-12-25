@@ -6,6 +6,7 @@ import time
 from typing import Dict, List, Optional
 from fastapi import Request, HTTPException
 import logging
+
 from ..config import (
     SLACK_SIGNING_SECRET,
     SLACK_RESULT_CHUNK_SIZE,
@@ -34,8 +35,8 @@ async def verify_slack_request(request: Request) -> bool:
         
     return True
 
-def format_search_results(results: List[Dict], query: str, thread_ts: Optional[str] = None) -> Dict:
-    """Format find results as Slack blocks"""
+async def format_search_results(results: List[Dict], query: str, summary: str, thread_ts: Optional[str] = None) -> Dict:
+    """Format search results and summary as Slack blocks"""
     if not results:
         return {
             "response_type": "in_channel",
@@ -49,53 +50,67 @@ def format_search_results(results: List[Dict], query: str, thread_ts: Optional[s
             }]
         }
     
-    blocks = [{
-        "type": "header",
-        "text": {
-            "type": "plain_text",
-            "text": f"🔍 Results for: {query}"
+    # Filter results with score > 0.6
+    high_confidence_results = [r for r in results if r['score'] > 0.6]
+    
+    blocks = [
+        {
+            "type": "header",
+            "text": {
+                "type": "plain_text",
+                "text": f"🔍 Results for: {query}"
+            }
         }
-    }]
+    ]
     
-    # Limit results
-    results = results[:SLACK_MAX_RESULTS]
-    
-    for i, result in enumerate(results, 1):
-        # Add divider between results
-        if i > 1:
-            blocks.append({"type": "divider"})
-            
-        # Add result block with truncated text
-        text = result['text']
-        if len(text) > SLACK_RESULT_CHUNK_SIZE:
-            text = text[:SLACK_RESULT_CHUNK_SIZE] + "..."
-            
+    # Add summary section if we have high-confidence results
+    if high_confidence_results:
+        blocks.extend([
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Summary:*\n{summary}"
+                }
+            },
+            {
+                "type": "divider"
+            }
+        ])
+    else:
         blocks.append({
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*Result {i}* (Score: {result['score']:.2f})\n```{text}```"
+                "text": "No high-confidence results found. Here are the available results:"
             }
         })
-        
-        # Add context with metadata
-        context_elements = []
-        if result['metadata'].get('filename'):
-            context_elements.append({
-                "type": "mrkdwn",
-                "text": f"*Source:* {result['metadata']['filename']}"
-            })
-        if result.get('found_by'):
-            context_elements.append({
-                "type": "mrkdwn",
-                "text": f"*Found by:* {', '.join(result['found_by'])}"
-            })
+    
+    # Add detailed results
+    results = high_confidence_results[:SLACK_MAX_RESULTS] if high_confidence_results else results[:SLACK_MAX_RESULTS]
+    for i, result in enumerate(results, 1):
+        text = result['text']
+        if len(text) > SLACK_RESULT_CHUNK_SIZE:
+            text = text[:SLACK_RESULT_CHUNK_SIZE] + "..."
             
-        if context_elements:
-            blocks.append({
+        blocks.extend([
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"*Result {i}* (Score: {result['score']:.2f})\n```{text}```"
+                }
+            },
+            {
                 "type": "context",
-                "elements": context_elements
-            })
+                "elements": [
+                    {
+                        "type": "mrkdwn",
+                        "text": f"*Source:* {result['metadata'].get('filename', 'Unknown')}"
+                    }
+                ]
+            }
+        ])
     
     return {
         "response_type": "in_channel",

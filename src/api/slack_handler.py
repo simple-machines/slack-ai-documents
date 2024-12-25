@@ -7,18 +7,30 @@ import json
 import logging
 from typing import Dict
 
-from ..search.hybrid_searcher import HybridSearcher
+from ..search.gemini_searcher import GeminiSearcher
 from ..config import SLACK_BOT_TOKEN, TOP_K
 from ..utils.slack_utils import verify_slack_request, format_search_results, extract_query
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Initialize searcher and Slack client
-searcher = HybridSearcher()
-if not SLACK_BOT_TOKEN:
-    raise ValueError("SLACK_BOT_TOKEN must be set")
-client = WebClient(token=SLACK_BOT_TOKEN)
+# Lazy initialization
+_searcher = None
+_client = None
+
+def get_searcher():
+    global _searcher
+    if _searcher is None:
+        _searcher = GeminiSearcher()
+    return _searcher
+
+def get_slack_client():
+    global _client
+    if _client is None:
+        if not SLACK_BOT_TOKEN:
+            raise ValueError("SLACK_BOT_TOKEN must be set")
+        _client = WebClient(token=SLACK_BOT_TOKEN)
+    return _client
 
 @router.post("/slack/events")
 async def handle_slack_events(request: Request):
@@ -65,6 +77,8 @@ async def handle_mention(event: Dict):
             "text_length": len(text)
         })
         
+        client = get_slack_client()
+        
         # Extract query from mention
         query = extract_query(text)
         if not query:
@@ -76,7 +90,8 @@ async def handle_mention(event: Dict):
             return {"ok": True}
         
         # Perform search
-        results = searcher.search(query, TOP_K)
+        searcher = get_searcher()
+        results = await searcher.search(query, TOP_K)
         
         # Format and send response
         response = format_search_results(results, query, thread_ts)
@@ -118,14 +133,15 @@ async def handle_slack_commands(request: Request):
             "user": user_id
         })
         
-        if command == "/find":  # Changed from /search to /find
+        if command == "/find":
             if not text:
                 return {
                     "response_type": "ephemeral",
                     "text": "Please provide a search query! Usage: `/find your query here`"
                 }
             
-            results = searcher.search(text, TOP_K)
+            searcher = get_searcher()
+            results = await searcher.search(text, TOP_K)
             return format_search_results(results, text, thread_ts)
             
         return {

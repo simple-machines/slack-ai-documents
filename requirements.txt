@@ -1,15 +1,27 @@
+# core google cloud dependencies
 google-cloud-aiplatform==1.36.0
 google-cloud-storage==2.10.0
-vertexai==0.0.1  
+google-generativeai>=0.3.0
+google-genai
+
+# fastapi and web
 fastapi==0.103.1
 uvicorn==0.23.2
-faiss-cpu==1.7.4
-numpy==1.24.3
-tqdm==4.66.1
-langchain
-langchain-google-community
 python-multipart==0.0.6
-scikit-learn==1.3.2
-PyPDF2==3.0.1
 requests==2.31.0
+
+# pdf processing
+PyPDF2==3.0.1
+
+# utilities
+python-dotenv==1.0.0
+tqdm==4.66.1
+
+# slack integration
 slack-sdk==3.26.1
+
+# type checking and api models
+pydantic==2.5.2
+
+# async support
+aiofiles==23.2.1  # added for async file operations

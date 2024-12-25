@@ -6,23 +6,18 @@ import os
 PROJECT_ID = os.getenv("PROJECT_ID")
 LOCATION = os.getenv("LOCATION", "us-central1")
 BUCKET_NAME = os.getenv("BUCKET_NAME")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Vertex AI models
-EMBEDDING_MODEL = "textembedding-gecko@003"
-GEMINI_MODEL = "gemini-1.0-pro-001"
+# Gemini model settings
+GEMINI_MODEL = "gemini-1.5-flash"
+MAX_OUTPUT_TOKENS = 2048
+TEMPERATURE = 0.2
 
-# storage paths
-INDEX_BLOB_PATH = "indexes/faiss_index.bin"
-METADATA_BLOB_PATH = "indexes/metadata.json"
+# Storage paths
 DOCUMENTS_PREFIX = "documents/"
 
-# document processing
-CHUNK_SIZE = 500
-CHUNK_OVERLAP = 50
-
-# search settings
+# Search settings
 TOP_K = 5
-HYBRID_ALPHA = 0.7  # weight for semantic vs keyword search
 
 # API settings
 MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10MB in bytes
@@ -31,5 +26,5 @@ MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10MB in bytes
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
 SLACK_MAX_RESULTS = 5
-SLACK_RESULT_CHUNK_SIZE = 300  # max characters per result chunk
-SLACK_RATE_LIMIT = 20  # requests per minute
+SLACK_RESULT_CHUNK_SIZE = 300
+SLACK_RATE_LIMIT = 20

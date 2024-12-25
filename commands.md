@@ -33,7 +33,7 @@ docker-compose up --build
 ```
 # process docuemnt:
 ```
-docker-compose run --rm vector-search python scripts/process_documents.py --input-dir /app/documents
+docker-compose run --rm gemini-search python scripts/process_documents.py --input-dir /app/documents
 ```
 # run search locally:
 ```
