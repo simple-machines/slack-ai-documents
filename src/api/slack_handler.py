@@ -149,7 +149,7 @@ slack_handler = SlackHandler()
 
 @router.post("/slack/events")
 async def handle_slack_events(request: Request):
-    # Assuming this method exists in your original SlackHandler
+    # assuming this method exists in your original SlackHandler
     return await slack_handler.handle_slack_events(request)
 
 @router.post("/slack/commands")

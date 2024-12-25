@@ -8,8 +8,6 @@ from pathlib import Path
 import tempfile
 
 from ..config import (
-    PROJECT_ID,
-    LOCATION,
     GEMINI_MODEL,
     TOP_P_THRESHOLD,
     DOCUMENTS_PREFIX,
@@ -42,7 +40,7 @@ class GeminiSearcher:
     async def search(self, query: str) -> List[Dict]:
         """
         search through documents using Gemini, returning results until the relevance threshold is met,
-        considering only results with an individual score of 0.80 or higher.
+        considering only results with an individual score of 0.85 or higher.
 
         args:
             query: search query string
@@ -87,12 +85,12 @@ class GeminiSearcher:
                 prompt = f"""
                 Search Query: {query}
 
-                Search through the provided documents and return relevant results with a relevance score.
+                Search through the provided documents and return relevant results that answer the query.
                 For each result, provide:
-                1. The relevant text passage
-                2. A relevance score between 0 and 1
-                3. A brief explanation of why this passage is relevant
-                4. The source document name
+                1. The text passage that answers the query.
+                2. A relevance score between 0 and 1.
+                3. An explanation of how this passage answers the query.
+                4. The source document name.
 
                 Format the response as a JSON array of objects with these exact keys:
                 - text: the relevant text passage
@@ -120,9 +118,9 @@ class GeminiSearcher:
                     # Log the scores of the raw results for debugging
                     logger.info(f"Raw Gemini results with scores: {[res.get('score') for res in results]}")
 
-                    # Filter results by individual score >= 0.80
-                    filtered_results = [result for result in results if result.get('score', 0) >= 0.80]
-                    logger.info(f"Filtered Gemini results (score >= 0.80): {[res.get('score') for res in filtered_results]}")
+                    # Filter results by individual score >= 0.85
+                    filtered_results = [result for result in results if result.get('score', 0) >= 0.85]
+                    logger.info(f"Filtered Gemini results (score >= 0.85): {[res.get('score') for res in filtered_results]}")
 
                     # format results and apply top_p logic
                     formatted_results = []

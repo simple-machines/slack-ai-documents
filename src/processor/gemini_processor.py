@@ -8,8 +8,6 @@ import json
 import base64
 
 from ..config import (
-    PROJECT_ID,
-    LOCATION,
     GEMINI_MODEL,
     DOCUMENTS_PREFIX,
     BUCKET_NAME,

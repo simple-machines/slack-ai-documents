@@ -55,16 +55,16 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"🔍 Results for: {query}"
+                "text": f"🧠 results for: {query}"
             }
         }
     ]
 
     # add each result as a separate section block
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
-        explanation = result['metadata'].get('relevance_explanation', 'No explanation provided.')
+        explanation = result['metadata'].get('relevance_explanation', 'no explanation provided.')
+        text = result['text']  # displaying the full text
         # text = result['text'].replace('\n', ' ')
-        text = result['text']
         score = result['score']
         metadata = result['metadata']
 
@@ -73,7 +73,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Result {i} (Score: {score:.2f})*\n*Explanation:* {explanation}\n*Passage:* {text[:SLACK_RESULT_CHUNK_SIZE]}..."
+                    "text": f"*Result {i} (Score: {score:.2f})*\n*explanation:* {explanation}\n*Passage:* {text}"
                 }
             },
             {
