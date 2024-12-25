@@ -24,14 +24,14 @@ async def verify_slack_request(request: Request) -> bool:
     slack_timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
 
     if abs(time.time() - float(slack_timestamp)) > 60 * 5:
-        raise HTTPException(status_code=403, detail="Request too old")
+        raise HTTPException(status_code=403, detail="request too old")
 
     body = await request.body()
     sig_basestring = f"v0:{slack_timestamp}:{body.decode()}"
     my_signature = f"v0={hmac.new(SLACK_SIGNING_SECRET.encode(), sig_basestring.encode(), hashlib.sha256).hexdigest()}"
 
     if not hmac.compare_digest(my_signature, slack_signature):
-        raise HTTPException(status_code=403, detail="Invalid signature")
+        raise HTTPException(status_code=403, detail="invalid signature")
 
     return True
 
@@ -63,7 +63,8 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     # add each result as a separate section block
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
         explanation = result['metadata'].get('relevance_explanation', 'No explanation provided.')
-        text = result['text'].replace('\n', ' ')  # Replace newline characters with spaces
+        # text = result['text'].replace('\n', ' ')
+        text = result['text']
         score = result['score']
         metadata = result['metadata']
 
@@ -72,7 +73,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Result {i} (Score: {score:.2f})*\n*Explanation:* {explanation}\n*Passage:* {text}"
+                    "text": f"*Result {i} (Score: {score:.2f})*\n*Explanation:* {explanation}\n*Passage:* {text[:SLACK_RESULT_CHUNK_SIZE]}..."
                 }
             },
             {
