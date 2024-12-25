@@ -37,12 +37,27 @@ class SlackHandler:
     def __init__(self):
         pass
 
-    async def _async_search_and_respond(self, text: str, thread_ts: Optional[str], channel_id: str, user_id: str):
+    async def _send_periodic_update(self, channel_id: str, thread_ts: Optional[str], stop_event: asyncio.Event):
+        client = get_slack_client()
+        while not stop_event.is_set():
+            try:
+                await client.chat_postMessage(
+                    channel=channel_id,
+                    thread_ts=thread_ts,
+                    text="preparing results... please wait ⏳"
+                )
+                await asyncio.sleep(3)
+            except SlackApiError as e:
+                logger.error(f"error sending periodic update: {e}")
+                break  # stop sending updates if there's an error
+
+    async def _async_search_and_respond(self, text: str, thread_ts: Optional[str], channel_id: str, user_id: str, stop_event: asyncio.Event):
         searcher = get_searcher()
         results = await searcher.search(text, TOP_K)
         response = await format_search_results(results, text, "", thread_ts)
         client = get_slack_client()
         await client.chat_postMessage(channel=channel_id, **response)
+        stop_event.set()  # signal to stop periodic updates
 
     async def handle_mention(self, event: Dict):
         """handle app mention events"""
@@ -126,11 +141,18 @@ class SlackHandler:
                     "response_type": "ephemeral",
                     "text": "searching for results... please wait 🧑‍💻"
                 }
+                get_slack_client().chat_postMessage(channel=channel_id, text=response['text'], thread_ts=thread_ts)
 
-                # process search asynchronously
-                asyncio.create_task(self._async_search_and_respond(text, thread_ts, channel_id, user_id))
+                # create an event to signal when to stop periodic updates
+                stop_event = asyncio.Event()
 
-                return response
+                # start sending periodic updates
+                asyncio.create_task(self._send_periodic_update(channel_id, thread_ts, stop_event))
+
+                # process search asynchronously and pass the stop event
+                asyncio.create_task(self._async_search_and_respond(text, thread_ts, channel_id, user_id, stop_event))
+
+                return {"ok": True}
 
             return {
                 "response_type": "ephemeral",
