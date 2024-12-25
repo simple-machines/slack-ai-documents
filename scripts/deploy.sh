@@ -58,7 +58,8 @@ gcloud run deploy vector-search \
 BUCKET_NAME=${BUCKET_NAME},\
 LOCATION=${LOCATION},\
 SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN},\
-SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}" \
+SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}, \
+GEMINI_API_KEY=${GEMINI_API_KEY}" \
   --service-account=vector-search-sa@${PROJECT_ID}.iam.gserviceaccount.com \
   --cpu-boost \
   --execution-environment=gen2

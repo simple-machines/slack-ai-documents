@@ -28,6 +28,14 @@ class GeminiSearcher:
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(GEMINI_MODEL)
         self.gcs = GCSHandler(bucket_name=BUCKET_NAME)
+    
+    def _clean_json_response(self, text: str) -> str:
+        """Clean the response text to get valid JSON"""
+        # Remove markdown code block markers
+        text = text.replace('```json', '').replace('```', '')
+        # Remove leading/trailing whitespace
+        text = text.strip()
+        return text
         
     async def search(self, query: str, k: int = TOP_K) -> List[Dict]:
         """
@@ -100,7 +108,10 @@ class GeminiSearcher:
                 
                 # Parse and format results
                 try:
-                    results = json.loads(response.text)
+                    # Clean the response text before parsing
+                    cleaned_response = self._clean_json_response(response.text)
+                    results = json.loads(cleaned_response)
+                    
                     if not isinstance(results, list):
                         logger.error(f"Unexpected response format: {response.text}")
                         return []
@@ -119,8 +130,9 @@ class GeminiSearcher:
                     
                     return formatted_results
                     
-                except json.JSONDecodeError:
+                except json.JSONDecodeError as e:
                     logger.error(f"Failed to parse Gemini response: {response.text}")
+                    logger.error(f"JSON parse error: {str(e)}")
                     return []
                     
             finally:
