@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import routes
 from . import slack_handler
 
-# Configure logging
+# configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -16,14 +16,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize FastAPI app
+# initialize FastAPI app
 app = FastAPI(
     title="Vector Search Service",
     description="API for semantic search with Slack integration",
     version="1.0.0"
 )
 
-# Add CORS middleware
+# add CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,39 +34,39 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def startup_event():
-    """Run startup tasks"""
+    """run startup tasks"""
     try:
-        logger.info("Starting application...")
+        logger.info("starting application...")
         
-        # Log non-sensitive environment variables
+        # log non-sensitive environment variables
         env_vars = {
             "PROJECT_ID": os.getenv("PROJECT_ID"),
             "BUCKET_NAME": os.getenv("BUCKET_NAME"),
             "PORT": os.getenv("PORT"),
             "LOCATION": os.getenv("LOCATION")
         }
-        logger.info("Environment variables: %s", {k: v for k, v in env_vars.items() if v is not None})
+        logger.info("environment variables: %s", {k: v for k, v in env_vars.items() if v is not None})
         
-        # Check required environment variables
+        # check required environment variables
         required_vars = ["PROJECT_ID", "BUCKET_NAME", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         if missing_vars:
-            raise ValueError(f"Missing required environment variables: {', '.join(missing_vars)}")
+            raise ValueError(f"missing required environment variables: {', '.join(missing_vars)}")
         
-        # Include routers
-        logger.info("Including routers...")
+        # include routers
+        logger.info("including routers...")
         app.include_router(routes.router, tags=["Search"])
         app.include_router(slack_handler.router, tags=["Slack"])
         
-        logger.info("Application startup complete")
+        logger.info("application startup complete")
         
     except Exception as e:
-        logger.error("Error during startup: %s", str(e), exc_info=True)
+        logger.error("error during startup: %s", str(e), exc_info=True)
         raise
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
+    """health check endpoint"""
     return {
         "status": "healthy",
         "version": "1.0.0",
@@ -76,7 +76,7 @@ async def health_check():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", "8080"))
-    logger.info("Starting uvicorn server on port %d", port)
+    logger.info("starting uvicorn server on port %d", port)
     uvicorn.run(
         "src.api.app:app",
         host="0.0.0.0",

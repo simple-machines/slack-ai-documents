@@ -11,16 +11,16 @@ from src.processor.gemini_processor import GeminiProcessor
 from src.config import DOCUMENTS_PREFIX
 
 async def process_file(file_path: Path, processor: GeminiProcessor, gcs: GCSHandler) -> None:
-    """Process a single file using Gemini"""
+    """process a single file using Gemini"""
     try:
-        print(f"Processing {file_path.name}...")
+        print(f"processing {file_path.name}...")
         
-        # Upload to GCS
+        # upload to GCS
         gcs_path = f"{DOCUMENTS_PREFIX}{file_path.name}"
         await gcs.upload_file(str(file_path), gcs_path)
-        print(f"Uploaded to GCS: {gcs_path}")
+        print(f"uploaded to GCS: {gcs_path}")
         
-        # Process with Gemini
+        # process with Gemini
         result = await processor.process_document(
             str(file_path),
             metadata={
@@ -28,25 +28,25 @@ async def process_file(file_path: Path, processor: GeminiProcessor, gcs: GCSHand
                 "gcs_path": gcs_path
             }
         )
-        print(f"Processed document: {file_path.name}")
-        print(f"Analysis summary: {result['analysis'][:200]}...")
+        print(f"processed document: {file_path.name}")
+        print(f"analysis summary: {result['analysis'][:200]}...")
         
     except Exception as e:
-        print(f"Error processing {file_path}: {str(e)}")
+        print(f"error processing {file_path}: {str(e)}")
 
 async def main():
-    # Load environment variables
+    # load environment variables
     load_dotenv()
     
-    parser = argparse.ArgumentParser(description='Process documents with Gemini')
+    parser = argparse.ArgumentParser(description='process documents with Gemini')
     parser.add_argument('--input-dir', required=True, help='directory containing documents')
     args = parser.parse_args()
     
-    # Initialize handlers
+    # initialize handlers
     gcs = GCSHandler(os.getenv('BUCKET_NAME'))
     processor = GeminiProcessor()
     
-    # Process all files in directory
+    # process all files in directory
     input_dir = Path(args.input_dir)
     tasks = []
     
@@ -54,9 +54,9 @@ async def main():
         if file_path.is_file():
             tasks.append(process_file(file_path, processor, gcs))
     
-    # Process files concurrently
+    # process files concurrently
     await asyncio.gather(*tasks)
-    print("Document processing complete!")
+    print("document processing complete!")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -31,7 +31,7 @@ class GCSHandler:
                 str(source_file)
             )
         except Exception as e:
-            logger.error(f"Error uploading file to GCS: {str(e)}")
+            logger.error(f"error uploading file to GCS: {str(e)}")
             raise
 
     async def download_file(self, source_blob_name: str, destination_file: Union[str, Path]) -> None:
@@ -45,7 +45,7 @@ class GCSHandler:
                 str(destination_file)
             )
         except Exception as e:
-            logger.error(f"Error downloading file from GCS: {str(e)}")
+            logger.error(f"error downloading file from GCS: {str(e)}")
             raise
 
     async def upload_from_string(self, data: str, destination_blob_name: str) -> None:
@@ -59,7 +59,7 @@ class GCSHandler:
                 data
             )
         except Exception as e:
-            logger.error(f"Error uploading string to GCS: {str(e)}")
+            logger.error(f"error uploading string to GCS: {str(e)}")
             raise
 
     async def download_as_string(self, source_blob_name: str) -> str:
@@ -73,7 +73,7 @@ class GCSHandler:
             )
             return content.decode("utf-8")
         except Exception as e:
-            logger.error(f"Error downloading string from GCS: {str(e)}")
+            logger.error(f"error downloading string from GCS: {str(e)}")
             raise
 
     async def upload_json(self, data: dict, destination_blob_name: str) -> None:
@@ -82,7 +82,7 @@ class GCSHandler:
             json_str = json.dumps(data, indent=2)
             await self.upload_from_string(json_str, destination_blob_name)
         except Exception as e:
-            logger.error(f"Error uploading JSON to GCS: {str(e)}")
+            logger.error(f"error uploading JSON to GCS: {str(e)}")
             raise
 
     async def download_json(self, source_blob_name: str) -> dict:
@@ -91,7 +91,7 @@ class GCSHandler:
             content = await self.download_as_string(source_blob_name)
             return json.loads(content)
         except Exception as e:
-            logger.error(f"Error downloading JSON from GCS: {str(e)}")
+            logger.error(f"error downloading JSON from GCS: {str(e)}")
             raise
 
     async def list_files(self, prefix: Optional[str] = None) -> List[str]:
@@ -104,7 +104,7 @@ class GCSHandler:
             )
             return [blob.name for blob in blobs]
         except Exception as e:
-            logger.error(f"Error listing files in GCS: {str(e)}")
+            logger.error(f"error listing files in GCS: {str(e)}")
             raise
 
     async def file_exists(self, blob_name: str) -> bool:
@@ -118,16 +118,16 @@ class GCSHandler:
             )
             return exists
         except Exception as e:
-            logger.error(f"Error checking file existence in GCS: {str(e)}")
+            logger.error(f"error checking file existence in GCS: {str(e)}")
             raise
 
     def __del__(self):
-        """Cleanup executor on deletion"""
+        """cleanup executor on deletion"""
         if hasattr(self, '_executor'):
             self._executor.shutdown(wait=False)
 
     async def download_as_bytes(self, source_blob_name: str) -> bytes:
-        """Download and return file contents as bytes"""
+        """download and return file contents as bytes"""
         try:
             blob: Blob = self.bucket.blob(source_blob_name)
             loop = asyncio.get_running_loop()
@@ -137,5 +137,5 @@ class GCSHandler:
             )
             return content
         except Exception as e:
-            logger.error(f"Error downloading bytes from GCS: {str(e)}")
+            logger.error(f"error downloading bytes from GCS: {str(e)}")
             raise

@@ -16,7 +16,7 @@ from ..config import (
 logger = logging.getLogger(__name__)
 
 async def verify_slack_request(request: Request) -> bool:
-    """Verify request is coming from Slack using signing secret"""
+    """verify request is coming from Slack using signing secret"""
     if not SLACK_SIGNING_SECRET:
         raise HTTPException(status_code=500, detail="Slack signing secret not configured")
 
@@ -36,7 +36,7 @@ async def verify_slack_request(request: Request) -> bool:
     return True
 
 async def format_search_results(results: List[Dict], query: str, summary: str, thread_ts: Optional[str] = None) -> Dict:
-    """Format search results using multiple Slack blocks for each result."""
+    """format search results using multiple Slack blocks for each result"""
     if not results:
         return {
             "response_type": "in_channel",
@@ -60,7 +60,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
         }
     ]
 
-    # Add each result as a separate section block
+    # add each result as a separate section block
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
         explanation = result['metadata'].get('relevance_explanation', 'No explanation provided.')
         text = result['text']
@@ -97,7 +97,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     }
 
 def extract_query(text: str, bot_user_id: str = None) -> str:
-    """Extract query from message text, removing bot mention if present"""
+    """extract query from message text, removing bot mention if present"""
     if bot_user_id and f"<@{bot_user_id}>" in text:
         return text.split(f"<@{bot_user_id}>")[1].strip()
     return text.strip()
