@@ -52,7 +52,7 @@ gcloud run deploy vector-search \
   --cpu=2 \
   --min-instances=0 \
   --max-instances=10 \
-  --timeout=300 \
+  --timeout=600 \
   --port=8080 \
   --set-env-vars="PROJECT_ID=${PROJECT_ID},\
 BUCKET_NAME=${BUCKET_NAME},\
