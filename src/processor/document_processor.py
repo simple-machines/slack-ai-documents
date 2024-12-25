@@ -1,4 +1,4 @@
-# src/indexer/document_processor.py
+# src/processor/document_processor.py
 
 from typing import List, Dict
 from langchain_text_splitters import RecursiveCharacterTextSplitter
