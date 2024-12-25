@@ -7,7 +7,7 @@ import logging
 
 from src.processor.gemini_processor import GeminiProcessor
 from src.search.gemini_searcher import GeminiSearcher
-from src.config import TOP_K, PROJECT_ID, LOCATION
+from src.config import TOP_P_THRESHOLD, PROJECT_ID, LOCATION
 
 router = APIRouter(tags=["API"])
 logger = logging.getLogger(__name__)
@@ -31,7 +31,6 @@ def get_searcher():
 class SearchQuery(BaseModel):
     """Schema for search query"""
     query: str = Field(..., description="The search query text")
-    top_k: Optional[int] = Field(default=TOP_K, description="Number of results to return")
 
 class SearchResult(BaseModel):
     """Schema for search result"""
@@ -39,24 +38,24 @@ class SearchResult(BaseModel):
     score: float = Field(..., description="Relevance score")
     metadata: dict = Field(..., description="Additional metadata about the result")
 
-@router.post("/find", response_model=List[SearchResult], 
+@router.post("/find", response_model=List[SearchResult],
             summary="Search documents",
-            description="Search through documents using Gemini")
+            description="Search through documents using Gemini based on relevance threshold")
 async def find(query: SearchQuery):
     """
-    Search endpoint that returns relevant documents based on the query text.
-    
+    Search endpoint that returns relevant documents based on the query text and a relevance threshold.
+
     Args:
-        query (SearchQuery): The search query and options
-        
+        query (SearchQuery): The search query.
+
     Returns:
-        List[SearchResult]: List of matching documents with scores
+        List[SearchResult]: List of matching documents with scores.
     """
     try:
         logger.info(f"Searching with query: {query.query}")
         searcher = get_searcher()
-        results = await searcher.search(query.query, query.top_k)
-        
+        results = await searcher.search(query.query)
+
         formatted_results = [
             SearchResult(
                 text=result["text"],
@@ -65,10 +64,10 @@ async def find(query: SearchQuery):
             )
             for result in results
         ]
-        
+
         logger.info(f"Found {len(formatted_results)} results")
         return formatted_results
-        
+
     except Exception as e:
         logger.error(f"Search error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
@@ -81,36 +80,36 @@ async def upload_document(
 ):
     """
     Upload and process a document.
-    
+
     Args:
         file (UploadFile): The document file to process
-        
+
     Returns:
         dict: Success message with analysis
     """
     try:
         logger.info(f"Processing document: {file.filename}")
-        
+
         # Save uploaded file temporarily
         temp_path = f"/tmp/{file.filename}"
         with open(temp_path, "wb") as buffer:
             content = await file.read()
             buffer.write(content)
-        
+
         # Process with Gemini
         processor = get_doc_processor()
         result = await processor.process_document(
             temp_path,
             metadata={"filename": file.filename}
         )
-        
+
         logger.info(f"Successfully processed document: {file.filename}")
         return {
             "message": "Document processed successfully",
             "filename": file.filename,
             "analysis": result["analysis"]
         }
-        
+
     except Exception as e:
         logger.error(f"Document processing error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))

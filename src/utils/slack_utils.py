@@ -72,7 +72,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Result {i} (Score: {score:.2f})*\n*Explanation:* {explanation}\n*Passage:* {text[:SLACK_RESULT_CHUNK_SIZE]}..."
+                    "text": f"*Result {i} (Score: {score:.2f})*\n*Explanation:* {explanation}\n*Passage:* {text}"
                 }
             },
             {

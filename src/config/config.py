@@ -17,7 +17,7 @@ TEMPERATURE = 0.2
 DOCUMENTS_PREFIX = "documents/"
 
 # Search Settings
-TOP_K = 5
+TOP_P_THRESHOLD = 0.99
 
 # API Settings
 MAX_DOCUMENT_SIZE = 10 * 1024 * 1024  # 10MB in bytes

@@ -9,7 +9,7 @@ from typing import Dict, Optional
 import asyncio
 
 from ..search.gemini_searcher import GeminiSearcher
-from ..config import SLACK_BOT_TOKEN, TOP_K
+from ..config import SLACK_BOT_TOKEN, TOP_P_THRESHOLD
 from ..utils.slack_utils import verify_slack_request, format_search_results, extract_query
 
 router = APIRouter()
@@ -39,7 +39,7 @@ class SlackHandler:
 
     async def _async_search_and_respond(self, text: str, thread_ts: Optional[str], channel_id: str, user_id: str):
         searcher = get_searcher()
-        results = await searcher.search(text, TOP_K)
+        results = await searcher.search(text)
         response = await format_search_results(results, text, "", thread_ts)
         client = get_slack_client()
         await client.chat_postMessage(channel=channel_id, **response)
@@ -72,7 +72,7 @@ class SlackHandler:
 
             # perform search
             searcher = get_searcher()
-            results = await searcher.search(query, TOP_K)
+            results = await searcher.search(query)
 
             # format and send response
             response = await format_search_results(results, query, "", thread_ts)
@@ -149,6 +149,7 @@ slack_handler = SlackHandler()
 
 @router.post("/slack/events")
 async def handle_slack_events(request: Request):
+    # Assuming this method exists in your original SlackHandler
     return await slack_handler.handle_slack_events(request)
 
 @router.post("/slack/commands")
