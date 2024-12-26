@@ -1,0 +1,10 @@
+{
+  "constraint": "constraints/iam.allowedPolicyMemberDomains",
+  "listPolicy": {
+    "allowedValues": [
+      "C01jtmjar",
+      "allAuthenticatedUsers"
+    ]
+  },
+  "updateTime": null
+}

@@ -150,8 +150,29 @@ slack_handler = SlackHandler()
 
 @router.post("/slack/events")
 async def handle_slack_events(request: Request):
-    # assuming this method exists in your original SlackHandler
-    return await slack_handler.handle_slack_events(request)
+    try:
+        # Get the raw request body as bytes first
+        body_bytes = await request.body()
+        # Parse it to json
+        body = json.loads(body_bytes)
+        
+        # Handle URL verification challenge
+        if body.get("type") == "url_verification":
+            return {"challenge": body.get("challenge")}
+        
+        # Verify request (only after challenge verification)
+        await verify_slack_request(request)
+        
+        # Handle app mention events
+        if body.get("event", {}).get("type") == "app_mention":
+            return await slack_handler.handle_mention(body["event"])
+        
+        # Return ok for other events
+        return {"ok": True}
+
+    except Exception as e:
+        logger.error("Error handling slack event", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/slack/commands")
 async def handle_commands(request: Request):
