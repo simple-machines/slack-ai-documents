@@ -50,7 +50,7 @@ gcloud run deploy vector-search \
   --allow-unauthenticated \
   --memory=4Gi \
   --cpu=2 \
-  --min-instances=0 \
+  --min-instances=2 \
   --max-instances=10 \
   --timeout=600 \
   --port=8080 \

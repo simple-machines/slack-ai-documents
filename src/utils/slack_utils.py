@@ -62,11 +62,12 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
 
     # add each result as a separate section block
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
-        explanation = result['metadata'].get('relevance_explanation', 'no explanation provided.')
+        explanation = result['metadata'].get('relevance_explanation', 'no explanation provided')
         text = result['text']  # displaying the full text
         # text = result['text'].replace('\n', ' ')
         score = result['score']
         metadata = result['metadata']
+        page = metadata.get('page')
 
         result_block = [
             {

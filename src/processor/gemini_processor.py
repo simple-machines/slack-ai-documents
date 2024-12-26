@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class GeminiProcessor:
     def __init__(self):
-        """Initialize Gemini processor with configuration"""
+        """initialize Gemini processor with configuration"""
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY environment variable not set")
             
@@ -34,29 +34,29 @@ class GeminiProcessor:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Process a document using Gemini API
+        process a document using gemini api
         
-        Args:
-            file_path: Path to the document file
-            metadata: Optional metadata about the document
+        args:
+            file_path: path to the document file
+            metadata: optional metadata about the document
             
-        Returns:
-            Dict containing processing results and metadata
+        returns:
+            dict containing processing results and metadata
         """
         try:
-            # Read file content
+            # read file content
             file_path = Path(file_path)
             mime_type = self._get_mime_type(file_path)
             
-            # Upload to GCS for storage
+            # upload to GCS for storage
             gcs_path = f"{DOCUMENTS_PREFIX}{file_path.name}"
             await self.gcs.upload_file(str(file_path), gcs_path)
             
-            # Upload to Gemini
+            # upload to Gemini
             file = genai.upload_file(str(file_path))
             
-            # Process with Gemini
-            # Remove await here
+            # process with Gemini
+            # remove await here
             response = self.model.generate_content([
                 file,
                 """Please analyze this document and provide:
@@ -66,7 +66,7 @@ class GeminiProcessor:
                 Format as JSON with keys: 'analysis', 'topics', 'details'"""
             ])
             
-            # Parse response
+            # parse response
             try:
                 analysis_result = json.loads(response.text)
             except json.JSONDecodeError:
@@ -76,7 +76,7 @@ class GeminiProcessor:
                     "details": ""
                 }
             
-            # Combine results
+            # combine results
             result = {
                 'gcs_path': gcs_path,
                 'analysis': analysis_result.get('analysis', ''),
@@ -89,18 +89,18 @@ class GeminiProcessor:
                 }
             }
             
-            # Store results in GCS
+            # store results in GCS
             results_path = f"{DOCUMENTS_PREFIX}analysis/{file_path.stem}_analysis.json"
             await self.gcs.upload_json(result, results_path)
             
             return result
             
         except Exception as e:
-            logger.error(f"Error processing document {file_path}: {str(e)}", exc_info=True)
+            logger.error(f"error processing document {file_path}: {str(e)}", exc_info=True)
             raise
     
     def _get_mime_type(self, file_path: Path) -> str:
-        """Determine mime type based on file extension"""
+        """determine mime type based on file extension"""
         ext = file_path.suffix.lower()
         mime_types = {
             '.pdf': 'application/pdf',
@@ -116,5 +116,5 @@ class GeminiProcessor:
         }
         mime_type = mime_types.get(ext)
         if not mime_type:
-            raise ValueError(f"Unsupported file type: {ext}")
+            raise ValueError(f"unsupported file type: {ext}")
         return mime_type

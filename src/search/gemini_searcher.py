@@ -133,6 +133,7 @@ class GeminiSearcher:
                                 'score': score,
                                 'metadata': {
                                     'filename': result.get('source', ''),
+                                    'page': result.get('page'),
                                     'relevance_explanation': result.get('explanation', '')
                                 }
                             })

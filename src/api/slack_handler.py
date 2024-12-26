@@ -42,7 +42,8 @@ class SlackHandler:
         results = await searcher.search(text)
         response = await format_search_results(results, text, "", thread_ts)
         client = get_slack_client()
-        await client.chat_postMessage(channel=channel_id, **response)
+        # await client.chat_postMessage(channel=channel_id, **response)
+        client.chat_postMessage(channel=channel_id, **response)
 
     async def handle_mention(self, event: Dict):
         """handle app mention events"""
