@@ -29,7 +29,7 @@ First, set up your Google Cloud environment:
 gsutil mb -l us-central1 gs://slack-ai-document-search
 
 # Set environment variables
-export PROJECT_ID=semantc-ai
+export PROJECT_ID=semantcai
 export LOCATION=us-central1
 export BUCKET_NAME=slack-ai-document-search
 export SLACK_BOT_TOKEN=xoxb-your-token
@@ -39,17 +39,17 @@ export GEMINI_API_KEY=your-gemini-api-key
 # Create service account and configure permissions
 gcloud iam service-accounts create document-search-sa
 
-gcloud projects add-iam-policy-binding semantc-ai \
-    --member="serviceAccount:document-search-sa@semantc-ai.iam.gserviceaccount.com" \
+gcloud projects add-iam-policy-binding semantcai \
+    --member="serviceAccount:document-search-sa@semantcai.iam.gserviceaccount.com" \
     --role="roles/storage.admin"
 
-gcloud projects add-iam-policy-binding semantc-ai \
-    --member="serviceAccount:document-search-sa@semantc-ai.iam.gserviceaccount.com" \
+gcloud projects add-iam-policy-binding semantcai \
+    --member="serviceAccount:document-search-sa@semantcai.iam.gserviceaccount.com" \
     --role="roles/aiplatform.user"
 
 # Download service account key
 gcloud iam service-accounts keys create service-account-key.json \
-    --iam-account=document-search-sa@semantc-ai.iam.gserviceaccount.com
+    --iam-account=document-search-sa@semantcai.iam.gserviceaccount.com
 ```
 
 ### 2. Slack App Configuration
