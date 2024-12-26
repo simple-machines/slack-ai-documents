@@ -40,7 +40,7 @@ class GeminiSearcher:
     async def search(self, query: str) -> List[Dict]:
         """
         search through documents using Gemini, returning results until the relevance threshold is met,
-        considering only results with an individual score of 0.85 or higher.
+        considering only results with an individual score of 0.90 or higher.
 
         args:
             query: search query string
@@ -118,9 +118,9 @@ class GeminiSearcher:
                     # Log the scores of the raw results for debugging
                     logger.info(f"Raw Gemini results with scores: {[res.get('score') for res in results]}")
 
-                    # Filter results by individual score >= 0.85
-                    filtered_results = [result for result in results if result.get('score', 0) >= 0.85]
-                    logger.info(f"Filtered Gemini results (score >= 0.85): {[res.get('score') for res in filtered_results]}")
+                    # Filter results by individual score >= 0.90
+                    filtered_results = [result for result in results if result.get('score', 0) >= 0.90]
+                    logger.info(f"Filtered Gemini results (score >= 0.90): {[res.get('score') for res in filtered_results]}")
 
                     # format results and apply top_p logic
                     formatted_results = []
