@@ -27,30 +27,6 @@ if [ -z "$SLACK_SIGNING_SECRET" ]; then
   exit 1
 fi
 
-if [ -z "$GEMINI_API_KEY" ]; then
-  echo "error: GEMINI_API_KEY environment variable is not set"
-  exit 1
-fi
-
-# enable required services
-echo "enabling required services..."
-gcloud services enable \
-    run.googleapis.com \
-    artifactregistry.googleapis.com \
-    cloudbuild.googleapis.com
-
-# create and configure Artifact Registry repository
-echo "Configuring Artifact Registry..."
-gcloud artifacts repositories create document-search \
-    --repository-format=docker \
-    --location=$LOCATION \
-    --description="document search service repository" \
-    || true
-
-# configure Docker authentication
-echo "Configuring Docker authentication..."
-gcloud auth configure-docker ${LOCATION}-docker.pkg.dev || true
-
 # create a buildx builder if it doesn't exist
 if ! docker buildx ls | grep -q "cloudrun-builder"; then
     docker buildx create --name cloudrun-builder --use
@@ -58,8 +34,8 @@ fi
 
 docker buildx use cloudrun-builder
 
-# build and push AMD64 image
-IMAGE_NAME="${LOCATION}-docker.pkg.dev/${PROJECT_ID}/document-search/document-search:latest"
+# build and push AMD64 image (Cloud Run uses AMD64)
+IMAGE_NAME="us-central1-docker.pkg.dev/${PROJECT_ID}/document-search/document-search:latest"
 echo "building and pushing AMD64 image..."
 docker buildx build --platform linux/amd64 \
   -t $IMAGE_NAME \
@@ -82,7 +58,7 @@ gcloud run deploy document-search \
 BUCKET_NAME=${BUCKET_NAME},\
 LOCATION=${LOCATION},\
 SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN},\
-SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET},\
+SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}, \
 GEMINI_API_KEY=${GEMINI_API_KEY}" \
   --service-account=document-search-sa@${PROJECT_ID}.iam.gserviceaccount.com \
   --cpu-boost \

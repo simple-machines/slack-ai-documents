@@ -1,3 +1,18 @@
+```
+gcloud organizations add-iam-policy-binding 923362929465 --member='user:info@semantc.com' --role='roles/orgpolicy.policyAdmin'
+gcloud resource-manager org-policies disable-enforce iam.disableServiceAccountKeyCreation --organization=923362929465 --verbosity=debug
+```
+
+# organization policy constraint
+```
+gcloud resource-manager org-policies describe constraints/iam.allowedPolicyMemberDomains \
+    --organization=923362929465
+
+
+gcloud resource-manager org-policies disable-enforce iam.allowedPolicyMemberDomains \
+    --organization=923362929465
+```
+
 # COMPLETE SETUP GUIDE FOR DOCUMENT SEARCH SERVICE
 
 ## 1. enable required google cloud apis
@@ -46,6 +61,9 @@ gcloud projects add-iam-policy-binding semantcai \
 gcloud projects add-iam-policy-binding semantcai \
     --member="serviceAccount:document-search-sa@semantcai.iam.gserviceaccount.com" \
     --role="roles/run.invoker"
+
+gcloud iam service-accounts keys create service-account-key.json \
+    --iam-account=document-search-sa@semantcai.iam.gserviceaccount.com
 ```
 
 ## 5. create artifact registry repository
