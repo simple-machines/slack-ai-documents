@@ -17,6 +17,16 @@ if [ -z "$BUCKET_NAME" ]; then
   exit 1
 fi
 
+if [ -z "$SLACK_BOT_TOKEN" ]; then
+  echo "error: SLACK_BOT_TOKEN environment variable is not set"
+  exit 1
+fi
+
+if [ -z "$SLACK_SIGNING_SECRET" ]; then
+  echo "error: SLACK_SIGNING_SECRET environment variable is not set"
+  exit 1
+fi
+
 # create a buildx builder if it doesn't exist
 if ! docker buildx ls | grep -q "cloudrun-builder"; then
     docker buildx create --name cloudrun-builder --use
@@ -40,11 +50,16 @@ gcloud run deploy vector-search \
   --allow-unauthenticated \
   --memory=4Gi \
   --cpu=2 \
-  --min-instances=0 \
+  --min-instances=2 \
   --max-instances=10 \
-  --timeout=300 \
+  --timeout=600 \
   --port=8080 \
-  --set-env-vars="PROJECT_ID=${PROJECT_ID},BUCKET_NAME=${BUCKET_NAME},LOCATION=${LOCATION}" \
+  --set-env-vars="PROJECT_ID=${PROJECT_ID},\
+BUCKET_NAME=${BUCKET_NAME},\
+LOCATION=${LOCATION},\
+SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN},\
+SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}, \
+GEMINI_API_KEY=${GEMINI_API_KEY}" \
   --service-account=vector-search-sa@${PROJECT_ID}.iam.gserviceaccount.com \
   --cpu-boost \
   --execution-environment=gen2
@@ -55,6 +70,19 @@ if [ $? -eq 0 ]; then
     echo "🌐 service URL: $SERVICE_URL"
     echo "testing health endpoint..."
     curl -s "${SERVICE_URL}/health"
+    
+    echo -e "\n📝 Next steps:"
+    echo "1. Configure your Slack app with these endpoints:"
+    echo "   - Events API URL: ${SERVICE_URL}/slack/events"
+    echo "   - Slash Commands URL: ${SERVICE_URL}/slack/commands"
+    echo "2. Subscribe to these Slack events:"
+    echo "   - app_mention"
+    echo "3. Add these Slack commands:"
+    echo "   - /find"
+    echo "4. Add these Slack bot token scopes:"
+    echo "   - app_mentions:read"
+    echo "   - chat:write"
+    echo "   - commands"
 else
     echo "❌ deployment failed!"
     echo "fetching logs..."

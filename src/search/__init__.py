@@ -1,3 +1,5 @@
 # src/search/__init__.py
 
-from .hybrid_searcher import HybridSearcher
+from .gemini_searcher import GeminiSearcher
+
+__all__ = ['GeminiSearcher']

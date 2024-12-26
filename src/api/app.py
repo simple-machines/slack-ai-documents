@@ -1,74 +1,86 @@
 # src/api/app.py
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
-from pydantic import BaseModel
-from typing import List, Optional
-import vertexai
-from vertexai.language_models import TextEmbeddingModel
-import numpy as np
+import os
+import logging
+import sys
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from . import routes
+from . import slack_handler
 
-from src.storage import IndexStore
-from src.indexer import DocumentProcessor
-from src.config import PROJECT_ID, LOCATION, TOP_K
+# configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
+logger = logging.getLogger(__name__)
 
-app = FastAPI(title="Vector Search Service")
+# initialize FastAPI app
+app = FastAPI(
+    title="Vector Search Service",
+    description="API for semantic search with Slack integration",
+    version="1.0.0"
+)
 
-# initialize services
-index_store = IndexStore()
-doc_processor = DocumentProcessor(PROJECT_ID, LOCATION)
+# add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class SearchQuery(BaseModel):
-    query: str
-    top_k: Optional[int] = TOP_K
-
-class SearchResult(BaseModel):
-    text: str
-    score: float
-    metadata: dict
-
-@app.post("/search", response_model=List[SearchResult])
-async def search(query: SearchQuery):
+@app.on_event("startup")
+async def startup_event():
+    """run startup tasks"""
     try:
-        # get query embedding
-        vertexai.init(project=PROJECT_ID, location=LOCATION)
-        model = TextEmbeddingModel.from_pretrained("textembedding-gecko@003")
-        query_emb = model.get_embeddings([query.query])[0].values
-        query_emb = np.array([query_emb]).astype('float32')
-
-        # search index
-        D, I = index_store.search(query_emb, k=query.top_k)
+        logger.info("starting application...")
         
-        # format results
-        results = []
-        for distance, idx in zip(D[0], I[0]):
-            chunk = index_store.metadata["chunks"][int(idx)]
-            results.append(SearchResult(
-                text=chunk["text"],
-                score=float(distance),
-                metadata=chunk["metadata"]
-            ))
+        # log non-sensitive environment variables
+        env_vars = {
+            "PROJECT_ID": os.getenv("PROJECT_ID"),
+            "BUCKET_NAME": os.getenv("BUCKET_NAME"),
+            "PORT": os.getenv("PORT"),
+            "LOCATION": os.getenv("LOCATION")
+        }
+        logger.info("environment variables: %s", {k: v for k, v in env_vars.items() if v is not None})
         
-        return results
-
+        # check required environment variables
+        required_vars = ["PROJECT_ID", "BUCKET_NAME", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
+        if missing_vars:
+            raise ValueError(f"missing required environment variables: {', '.join(missing_vars)}")
+        
+        # include routers
+        logger.info("including routers...")
+        app.include_router(routes.router, tags=["Search"])
+        app.include_router(slack_handler.router, tags=["Slack"])
+        
+        logger.info("application startup complete")
+        
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/documents/")
-async def upload_document(file: UploadFile = File(...)):
-    try:
-        contents = await file.read()
-        doc_processor.process_and_index_document(
-            content=contents.decode(),
-            metadata={"filename": file.filename}
-        )
-        return {"message": "document processed successfully"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("error during startup: %s", str(e), exc_info=True)
+        raise
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    """health check endpoint"""
+    return {
+        "status": "healthy",
+        "version": "1.0.0",
+        "env": os.getenv("ENV", "production")
+    }
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8080)
+    port = int(os.getenv("PORT", "8080"))
+    logger.info("starting uvicorn server on port %d", port)
+    uvicorn.run(
+        "src.api.app:app",
+        host="0.0.0.0",
+        port=port,
+        log_level="info",
+        access_log=True
+    )
