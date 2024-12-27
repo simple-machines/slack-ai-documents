@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # initialize FastAPI app
 app = FastAPI(
-    title="Vector Search Service",
+    title="Document Search Service",
     description="API for semantic search with Slack integration",
     version="1.0.0"
 )

@@ -35,7 +35,7 @@ fi
 docker buildx use cloudrun-builder
 
 # build and push AMD64 image (Cloud Run uses AMD64)
-IMAGE_NAME="us-central1-docker.pkg.dev/${PROJECT_ID}/vector-search/vector-search:latest"
+IMAGE_NAME="us-central1-docker.pkg.dev/${PROJECT_ID}/document-search/document-search:latest"
 echo "building and pushing AMD64 image..."
 docker buildx build --platform linux/amd64 \
   -t $IMAGE_NAME \
@@ -43,7 +43,7 @@ docker buildx build --platform linux/amd64 \
   .
 
 echo "deploying to Cloud Run..."
-gcloud run deploy vector-search \
+gcloud run deploy document-search \
   --image $IMAGE_NAME \
   --platform managed \
   --region $LOCATION \
@@ -60,13 +60,13 @@ LOCATION=${LOCATION},\
 SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN},\
 SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}, \
 GEMINI_API_KEY=${GEMINI_API_KEY}" \
-  --service-account=vector-search-sa@${PROJECT_ID}.iam.gserviceaccount.com \
+  --service-account=document-search-sa@${PROJECT_ID}.iam.gserviceaccount.com \
   --cpu-boost \
   --execution-environment=gen2
 
 if [ $? -eq 0 ]; then
     echo "✅ deployment successful!"
-    SERVICE_URL=$(gcloud run services describe vector-search --platform managed --region $LOCATION --format 'value(status.url)')
+    SERVICE_URL=$(gcloud run services describe document-search --platform managed --region $LOCATION --format 'value(status.url)')
     echo "🌐 service URL: $SERVICE_URL"
     echo "testing health endpoint..."
     curl -s "${SERVICE_URL}/health"
@@ -86,5 +86,5 @@ if [ $? -eq 0 ]; then
 else
     echo "❌ deployment failed!"
     echo "fetching logs..."
-    gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=vector-search" --limit 50
+    gcloud logging read "resource.type=cloud_run_revision AND resource.labels.service_name=document-search" --limit 50
 fi

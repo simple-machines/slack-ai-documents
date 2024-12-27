@@ -36,7 +36,6 @@ async def verify_slack_request(request: Request) -> bool:
     return True
 
 async def format_search_results(results: List[Dict], query: str, summary: str, thread_ts: Optional[str] = None) -> Dict:
-    """format search results using multiple Slack blocks for each result"""
     if not results:
         return {
             "response_type": "in_channel",
@@ -60,21 +59,18 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
         }
     ]
 
-    # add each result as a separate section block
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
         explanation = result['metadata'].get('relevance_explanation', 'no explanation provided')
-        text = result['text']  # displaying the full text
-        # text = result['text'].replace('\n', ' ')
+        text = result['text']  # full text passage
         score = result['score']
         metadata = result['metadata']
-        page = metadata.get('page')
 
         result_block = [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Result {i} (Score: {score:.2f})*\n*explanation:* {explanation}\n*Passage:* {text}"
+                    "text": f"*result {i} (score: {score:.2f})*\n*explanation:* {explanation}\n*passage:* {text}"
                 }
             },
             {
@@ -82,7 +78,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"*Source:* {metadata.get('filename', 'Unknown')}"
+                        "text": f"*source:* {metadata.get('filename', 'Unknown')}"
                     }
                 ]
             },

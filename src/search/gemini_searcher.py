@@ -24,7 +24,7 @@ class GeminiSearcher:
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY environment variable not set")
 
-        # Configure with API key
+        # configure with API key
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(GEMINI_MODEL)
         self.gcs = GCSHandler(bucket_name=BUCKET_NAME)
@@ -37,22 +37,30 @@ class GeminiSearcher:
         text = text.strip()
         return text
 
+    def _get_mime_type(self, ext: str) -> str:
+        """determine mime type based on file extension"""
+        mime_types = {
+            '.pdf': 'application/pdf',
+            '.txt': 'text/plain',
+            '.py': 'text/x-python',
+            '.js': 'application/javascript',
+            '.html': 'text/html',
+            '.css': 'text/css',
+            '.md': 'text/markdown',
+            '.csv': 'text/csv',
+            '.xml': 'text/xml',
+            '.rtf': 'text/rtf'
+        }
+        mime_type = mime_types.get(ext.lower())
+        if not mime_type:
+            mime_type = 'text/plain'  # default to text/plain if unknown
+        return mime_type
+
     async def search(self, query: str) -> List[Dict]:
-        """
-        search through documents using Gemini, returning results until the relevance threshold is met,
-        considering only results with an individual score of 0.90 or higher.
-
-        args:
-            query: search query string
-
-        returns:
-            list of search results with scores and metadata
-        """
+        """search through documents using Gemini"""
         try:
             # get list of documents
             files = await self.gcs.list_files(prefix=DOCUMENTS_PREFIX)
-
-            # filter out analysis files
             doc_files = [f for f in files if not f.endswith('_analysis.json')]
 
             if not doc_files:
@@ -63,40 +71,54 @@ class GeminiSearcher:
             temp_files = []
             for file_path in doc_files:
                 try:
-                    # download file content to temp file
                     content = await self.gcs.download_as_bytes(file_path)
-
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file_path).suffix) as tmp:
+                    ext = Path(file_path).suffix.lower()
+                    mime_type = self._get_mime_type(ext)
+                    
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
                         tmp.write(content)
-                        temp_files.append((tmp.name, Path(file_path).name))
-
+                        tmp.flush()
+                        temp_files.append((tmp.name, Path(file_path).name, mime_type))
                 except Exception as e:
                     logger.error(f"error loading file {file_path}: {str(e)}")
                     continue
 
             try:
+                # create temporary file for query
+                with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp:
+                    temp_path = temp.name
+                    temp.write(query)
+                    temp.flush()
+
                 # upload files to Gemini
+                query_file = genai.upload_file(temp_path, mime_type='text/plain')
+                
                 gemini_files = []
-                for temp_path, original_name in temp_files:
-                    file = genai.upload_file(temp_path)
+                for temp_path, original_name, mime_type in temp_files:
+                    file = genai.upload_file(temp_path, mime_type=mime_type)
                     gemini_files.append((file, original_name))
 
-                # Create search prompt
+                # enhanced search prompt
                 prompt = f"""
                 Search Query: {query}
 
-                Search through the provided documents and return relevant results that answer the query.
-                For each result, provide:
-                1. The text passage that answers the query.
-                2. A relevance score between 0 and 1.
-                3. An explanation of how this passage answers the query.
-                4. The source document name.
+                Search through the provided documents and find ALL relevant passages that answer or relate to the query.
+                Be thorough - if multiple different sections contain relevant information, include them all.
+                
+                For each relevant passage found, provide:
+                1. The complete text passage that contains the answer (preserve full context)
+                2. A relevance score between 0 and 1 (be precise in scoring - if multiple passages are equally relevant, give them the same score)
+                3. A detailed explanation of how this passage relates to or answers the query
+                4. The source document name
 
-                Format the response as a JSON array of objects with these exact keys:
-                - text: the relevant text passage
+                Return ALL passages that are highly relevant (don't limit to just the best match).
+                Format each result as a JSON object with these exact keys:
+                - text: the complete relevant passage
                 - score: a float between 0 and 1
-                - explanation: why this is relevant
+                - explanation: detailed explanation of relevance
                 - source: the document name
+
+                Return as a JSON array containing ALL relevant results.
                 """
 
                 # generate search results
@@ -105,9 +127,7 @@ class GeminiSearcher:
 
                 response = self.model.generate_content(content_parts)
 
-                # parse and format results
                 try:
-                    # clean the response text before parsing
                     cleaned_response = self._clean_json_response(response.text)
                     results = json.loads(cleaned_response)
 
@@ -115,16 +135,18 @@ class GeminiSearcher:
                         logger.error(f"unexpected response format: {response.text}")
                         return []
 
-                    # Log the scores of the raw results for debugging
+                    # log raw results
                     logger.info(f"Raw Gemini results with scores: {[res.get('score') for res in results]}")
 
-                    # Filter results by individual score >= 0.90
+                    # filter results by individual score >= 0.90
                     filtered_results = [result for result in results if result.get('score', 0) >= 0.90]
                     logger.info(f"Filtered Gemini results (score >= 0.90): {[res.get('score') for res in filtered_results]}")
 
-                    # format results and apply top_p logic
+                    # format results and apply top_p logic with cumulative threshold
                     formatted_results = []
                     cumulative_score = 0.0
+                    
+                    # sort by score in descending order
                     for result in sorted(filtered_results, key=lambda x: x.get('score', 0), reverse=True):
                         score = float(result.get('score', 0))
                         if cumulative_score + score <= TOP_P_THRESHOLD:
@@ -133,7 +155,7 @@ class GeminiSearcher:
                                 'score': score,
                                 'metadata': {
                                     'filename': result.get('source', ''),
-                                    'page': result.get('page'),
+                                    'page': result.get('page', 1),
                                     'relevance_explanation': result.get('explanation', '')
                                 }
                             })
@@ -150,7 +172,9 @@ class GeminiSearcher:
 
             finally:
                 # clean up temporary files
-                for temp_path, _ in temp_files:
+                if Path(temp_path).exists():
+                    Path(temp_path).unlink()
+                for temp_path, _, _ in temp_files:
                     try:
                         Path(temp_path).unlink()
                     except Exception as e:
