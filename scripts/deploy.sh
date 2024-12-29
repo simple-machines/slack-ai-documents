@@ -27,6 +27,14 @@ if [ -z "$GOOGLE_DRIVE_FOLDER_ID" ]; then
   exit 1
 fi
 
+if [ ! -f "service-account-key.json" ]; then
+  echo "error: service-account-key.json not found in project root"
+  exit 1
+fi
+
+# Set working directory to project root (one level up from scripts)
+cd "$(dirname "$0")/.."
+
 # create a buildx builder if it doesn't exist
 if ! docker buildx ls | grep -q "cloudrun-builder"; then
     docker buildx create --name cloudrun-builder --use
@@ -60,7 +68,7 @@ SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN},\
 SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET},\
 GEMINI_API_KEY=${GEMINI_API_KEY},\
 GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID},\
-GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/service-account-key.json" \
+GOOGLE_APPLICATION_CREDENTIALS=/service-account-key.json" \
   --service-account=document-search-sa@${PROJECT_ID}.iam.gserviceaccount.com \
   --cpu-boost \
   --execution-environment=gen2

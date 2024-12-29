@@ -8,8 +8,12 @@ export GOOGLE_DRIVE_FOLDER_ID=1Dg49mPT-Y9JdSEKrBUcamoWnD1Azy63u
 export GOOGLE_APPLICATION_CREDENTIALS=/service-account-key.json
 
 # enable apis
+```
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
     cloudbuild.googleapis.com cloudresourcemanager.googleapis.com iam.googleapis.com
+
+gcloud services enable drive.googleapis.com
+```
 
 # organization policy setup
 gcloud organizations add-iam-policy-binding 923362929465 \
@@ -24,6 +28,7 @@ gsutil mb -l us-central1 gs://$BUCKET_NAME
 gsutil uniformbucketlevelaccess set on gs://$BUCKET_NAME
 
 # service account setup
+```
 gcloud iam service-accounts create document-search-sa \
     --display-name="Document Search Service Account"
 
@@ -39,8 +44,13 @@ gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:document-search-sa@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/run.invoker"
 
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member="serviceAccount:document-search-sa@$PROJECT_ID.iam.gserviceaccount.com" \
+    --role="roles/drive.admin"
+
 gcloud iam service-accounts keys create service-account-key.json \
     --iam-account=document-search-sa@$PROJECT_ID.iam.gserviceaccount.com
+```
 
 # artifact registry setup
 gcloud artifacts repositories create document-search \

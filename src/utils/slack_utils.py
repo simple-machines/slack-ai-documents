@@ -75,11 +75,11 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
         metadata = result['metadata']
         download_link = metadata.get('download_link', '')
 
-        # Create the main text block
-        main_text = f"*Result {i} (Score: {score:.2f})*\n"
-        main_text += f"*Source:* {metadata.get('filename', 'Unknown')}\n"
-        main_text += f"*Passage:* {text}"
-        main_text += f"*Explanation:* {explanation}\n"
+        # create the main text block
+        main_text = f"*result {i} (Score: {score:.2f})*\n"
+        main_text += f"*source:* {metadata.get('filename', 'Unknown')}\n"
+        main_text += f"*passage:* {text}\n"
+        main_text += f"*explanation:* {explanation}\n"
 
         result_block = [
             {
@@ -91,13 +91,13 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             }
         ]
 
-        # Add download button if link is available
+        # add download button if link is available
         if download_link:
             result_block.append({
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": "*Document Link:* " + download_link
+                    "text": "*document link:* " + download_link
                 }
             })
             result_block.append({
@@ -107,7 +107,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                         "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": "📥 Download Document",
+                            "text": "📥 download document",
                             "emoji": True
                         },
                         "url": download_link,
@@ -125,12 +125,12 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     return {
         "response_type": "in_channel",
         "thread_ts": thread_ts,
-        "text": text_content,  # Add plain text version for notifications
+        "text": text_content,  # add plain text version for notifications
         "blocks": blocks
     }
 
 def extract_query(text: str, bot_user_id: str = None) -> str:
-    """Extract query from message text, removing bot mention if present"""
+    """extract query from message text, removing bot mention if present"""
     if bot_user_id and f"<@{bot_user_id}>" in text:
         return text.split(f"<@{bot_user_id}>")[1].strip()
     return text.strip()

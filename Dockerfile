@@ -7,11 +7,6 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Create directory for service account key and ensure /tmp is writable
-RUN mkdir -p /tmp/keys && \
-    chmod 777 /tmp && \
-    chmod 777 /tmp/keys
-
 # Copy requirements and setup files first
 COPY requirements.txt setup.py ./
 
@@ -20,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install -e .
 
 # Copy service account key
-COPY service-account-key.json /tmp/keys/service-account-key.json
+COPY service-account-key.json /service-account-key.json
 
 # Copy application code
 COPY . .
@@ -28,7 +23,7 @@ COPY . .
 # Create non-root user and set permissions
 RUN useradd -m myuser && \
     chown -R myuser:myuser /app && \
-    chown -R myuser:myuser /tmp
+    chown myuser:myuser /service-account-key.json
 
 USER myuser
 
