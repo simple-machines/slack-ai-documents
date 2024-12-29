@@ -1,5 +1,5 @@
 # src/storage/__init__.py
 
-from .gcs import GCSHandler
+from .drive import GoogleDriveHandler
 
-__all__ = ['GCSHandler']
+__all__ = ['GoogleDriveHandler']

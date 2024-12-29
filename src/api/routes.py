@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, File, UploadFile, Query
 from pydantic import BaseModel, Field
 from typing import List, Optional
 import logging
+import os
 
 from src.processor.gemini_processor import GeminiProcessor
 from src.search.gemini_searcher import GeminiSearcher
@@ -37,6 +38,13 @@ class SearchResult(BaseModel):
     text: str = Field(..., description="The matched text content")
     score: float = Field(..., description="Relevance score")
     metadata: dict = Field(..., description="Additional metadata about the result")
+
+class DocumentResponse(BaseModel):
+    """schema for document upload response"""
+    message: str = Field(..., description="Status message")
+    filename: str = Field(..., description="Uploaded file name")
+    analysis: dict = Field(..., description="Document analysis results")
+    download_link: str = Field(..., description="Google Drive download link")
 
 @router.post("/find", response_model=List[SearchResult],
             summary="search documents",
@@ -73,8 +81,9 @@ async def find(query: SearchQuery):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/documents",
+            response_model=DocumentResponse,
             summary="upload document",
-            description="upload and process a document using Gemini")
+            description="upload and process a document using Gemini and store in Google Drive")
 async def upload_document(
     file: UploadFile = File(..., description="the document file to upload")
 ):
@@ -85,30 +94,41 @@ async def upload_document(
         file (uploadfile): the document file to process
 
     returns:
-        dict: success message with analysis
+        DocumentResponse: success message with analysis and download link
     """
     try:
         logger.info(f"processing document: {file.filename}")
 
+        # Create temp directory if it doesn't exist
+        os.makedirs("/tmp", exist_ok=True)
+
         # save uploaded file temporarily
         temp_path = f"/tmp/{file.filename}"
-        with open(temp_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
+        try:
+            with open(temp_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
 
-        # process with Gemini
-        processor = get_doc_processor()
-        result = await processor.process_document(
-            temp_path,
-            metadata={"filename": file.filename}
-        )
+            # process with Gemini
+            processor = get_doc_processor()
+            result = await processor.process_document(
+                temp_path,
+                metadata={"filename": file.filename}
+            )
 
-        logger.info(f"successfully processed document: {file.filename}")
-        return {
-            "message": "document processed successfully",
-            "filename": file.filename,
-            "analysis": result["analysis"]
-        }
+            logger.info(f"successfully processed document: {file.filename}")
+            return DocumentResponse(
+                message="document processed successfully",
+                filename=file.filename,
+                analysis=result["analysis"],
+                download_link=result["drive_link"]
+            )
+
+        finally:
+            # Clean up temp file
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+                logger.info(f"cleaned up temporary file: {temp_path}")
 
     except Exception as e:
         logger.error(f"document processing error: {str(e)}", exc_info=True)

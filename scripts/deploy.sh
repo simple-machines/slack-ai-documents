@@ -12,11 +12,6 @@ if [ -z "$LOCATION" ]; then
   exit 1
 fi
 
-if [ -z "$BUCKET_NAME" ]; then
-  echo "error: BUCKET_NAME environment variable is not set"
-  exit 1
-fi
-
 if [ -z "$SLACK_BOT_TOKEN" ]; then
   echo "error: SLACK_BOT_TOKEN environment variable is not set"
   exit 1
@@ -60,7 +55,6 @@ gcloud run deploy document-search \
   --timeout=600 \
   --port=8080 \
   --set-env-vars="PROJECT_ID=${PROJECT_ID},\
-BUCKET_NAME=${BUCKET_NAME},\
 LOCATION=${LOCATION},\
 SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN},\
 SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET},\

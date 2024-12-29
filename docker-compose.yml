@@ -10,7 +10,6 @@ services:
     environment:
       - PROJECT_ID=${PROJECT_ID}
       - LOCATION=${LOCATION}
-      - BUCKET_NAME=${BUCKET_NAME}
       - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}
       - SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}
       - GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/sa-key.json

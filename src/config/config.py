@@ -2,10 +2,9 @@
 
 import os
 
-# Google Cloud Settings
+# Google Settings
 PROJECT_ID = os.getenv("PROJECT_ID")
 LOCATION = os.getenv("LOCATION", "us-central1")
-BUCKET_NAME = os.getenv("BUCKET_NAME")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Google Drive Settings
@@ -16,9 +15,6 @@ SERVICE_ACCOUNT_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/service-acc
 GEMINI_MODEL = "gemini-1.5-flash"
 MAX_OUTPUT_TOKENS = 2048
 TEMPERATURE = 0.2
-
-# Storage Paths
-DOCUMENTS_PREFIX = "documents/"
 
 # Search Settings
 TOP_P_THRESHOLD = 2.0

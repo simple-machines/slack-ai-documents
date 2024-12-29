@@ -36,10 +36,12 @@ async def verify_slack_request(request: Request) -> bool:
     return True
 
 async def format_search_results(results: List[Dict], query: str, summary: str, thread_ts: Optional[str] = None) -> Dict:
+    """Format search results for Slack message"""
     if not results:
         return {
             "response_type": "in_channel",
             "thread_ts": thread_ts,
+            "text": "No results found for your query.",
             "blocks": [{
                 "type": "section",
                 "text": {
@@ -48,6 +50,13 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                 }
             }]
         }
+
+    # Create the text version for notifications/screen readers
+    text_content = f"Search Results for: {query}\n"
+    for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
+        text_content += f"\nResult {i} (Score: {result['score']:.2f})\n"
+        text_content += f"Source: {result['metadata'].get('filename', 'Unknown')}\n"
+        text_content += f"{result['text']}\n"
 
     blocks = [
         {
@@ -66,27 +75,31 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
         metadata = result['metadata']
         download_link = metadata.get('download_link', '')
 
+        # Create the main text block
+        main_text = f"*Result {i} (Score: {score:.2f})*\n"
+        main_text += f"*Source:* {metadata.get('filename', 'Unknown')}\n"
+        main_text += f"*Passage:* {text}"
+        main_text += f"*Explanation:* {explanation}\n"
+
         result_block = [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*Result {i} (Score: {score:.2f})*\n*Explanation:* {explanation}\n*Passage:* {text}"
+                    "text": main_text
                 }
-            },
-            {
-                "type": "context",
-                "elements": [
-                    {
-                        "type": "mrkdwn",
-                        "text": f"*Source:* {metadata.get('filename', 'Unknown')}"
-                    }
-                ]
             }
         ]
 
         # Add download button if link is available
         if download_link:
+            result_block.append({
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": "*Document Link:* " + download_link
+                }
+            })
             result_block.append({
                 "type": "actions",
                 "elements": [
@@ -94,7 +107,8 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                         "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": "📥 Download Document"
+                            "text": "📥 Download Document",
+                            "emoji": True
                         },
                         "url": download_link,
                         "action_id": f"download_doc_{i}"
@@ -111,6 +125,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     return {
         "response_type": "in_channel",
         "thread_ts": thread_ts,
+        "text": text_content,  # Add plain text version for notifications
         "blocks": blocks
     }
 

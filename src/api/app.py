@@ -41,14 +41,19 @@ async def startup_event():
         # log non-sensitive environment variables
         env_vars = {
             "PROJECT_ID": os.getenv("PROJECT_ID"),
-            "BUCKET_NAME": os.getenv("BUCKET_NAME"),
             "PORT": os.getenv("PORT"),
             "LOCATION": os.getenv("LOCATION")
         }
         logger.info("environment variables: %s", {k: v for k, v in env_vars.items() if v is not None})
         
         # check required environment variables
-        required_vars = ["PROJECT_ID", "BUCKET_NAME", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]
+        required_vars = [
+            "PROJECT_ID",
+            "SLACK_BOT_TOKEN",
+            "SLACK_SIGNING_SECRET",
+            "GOOGLE_DRIVE_FOLDER_ID",
+            "GEMINI_API_KEY"
+        ]
         missing_vars = [var for var in required_vars if not os.getenv(var)]
         if missing_vars:
             raise ValueError(f"missing required environment variables: {', '.join(missing_vars)}")

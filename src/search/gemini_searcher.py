@@ -10,11 +10,11 @@ import tempfile
 from ..config import (
     GEMINI_MODEL,
     TOP_P_THRESHOLD,
-    DOCUMENTS_PREFIX,
-    BUCKET_NAME,
+    GOOGLE_DRIVE_FOLDER_ID,
+    SERVICE_ACCOUNT_PATH,
     GEMINI_API_KEY
 )
-from ..storage.gcs import GCSHandler
+from ..storage.drive import GoogleDriveHandler
 
 logger = logging.getLogger(__name__)
 
@@ -27,52 +27,10 @@ class GeminiSearcher:
         # Configure with API key
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(GEMINI_MODEL)
-        self.gcs = GCSHandler(bucket_name=BUCKET_NAME)
-        
-    async def _get_actual_filename(self, doc_files: List[str], source: str) -> str:
-        """Match the source name to actual file in GCS bucket"""
-        # If the source matches exactly, return it
-        if source in doc_files:
-            return source
-            
-        # Clean up source name and try to match
-        source_clean = source.lower().replace(" ", "_")
-        for file in doc_files:
-            if file.lower().endswith('.pdf'):
-                return file
-                
-        # If no match found, return original source
-        return source
-
-    async def _get_document_metadata(self, filename: str, doc_files: List[str]) -> Dict[str, Any]:
-        """Get document metadata including download link from analysis file"""
-        try:
-            # Get actual filename from GCS
-            actual_filename = await self._get_actual_filename(doc_files, filename)
-            logger.info(f"Matched source '{filename}' to actual file '{actual_filename}'")
-            
-            # Try to get the analysis file if it exists
-            try:
-                analysis_path = f"{DOCUMENTS_PREFIX}analysis/{Path(actual_filename).stem}_analysis.json"
-                metadata = await self.gcs.download_json(analysis_path)
-                return {
-                    'filename': filename,  # Keep original name for display
-                    'actual_filename': actual_filename,  # Store actual filename
-                    'download_link': metadata.get('drive_link', ''),
-                    'mime_type': metadata.get('metadata', {}).get('mime_type', '')
-                }
-            except Exception as analysis_error:
-                logger.info(f"Analysis file not found for {actual_filename}, using basic metadata")
-                return {
-                    'filename': filename,
-                    'actual_filename': actual_filename,
-                    'download_link': '',
-                    'mime_type': self._get_mime_type(Path(actual_filename).suffix)
-                }
-                
-        except Exception as e:
-            logger.error(f"Error getting metadata for {filename}: {str(e)}")
-            return {'filename': filename}
+        self.drive = GoogleDriveHandler(
+            credentials_path=SERVICE_ACCOUNT_PATH,
+            folder_id=GOOGLE_DRIVE_FOLDER_ID
+        )
 
     def _clean_json_response(self, text: str) -> str:
         """Clean the response text to get valid JSON"""
@@ -98,33 +56,58 @@ class GeminiSearcher:
             mime_type = 'text/plain'
         return mime_type
 
+    async def _get_document_metadata(self, filename: str, drive_files: List[Dict]) -> Dict[str, Any]:
+        """Get document metadata from Drive files list"""
+        try:
+            # Find the file in drive_files
+            for file in drive_files:
+                if file['name'] == filename:
+                    properties = file.get('properties', {})
+                    # Parse stored JSON properties
+                    try:
+                        analysis = json.loads(properties.get('analysis', '""'))
+                        topics = json.loads(properties.get('topics', '[]'))
+                        details = json.loads(properties.get('details', '""'))
+                    except json.JSONDecodeError:
+                        analysis, topics, details = "", [], ""
+                        
+                    return {
+                        'filename': filename,
+                        'download_link': file.get('webViewLink', ''),
+                        'mime_type': file.get('mimeType', ''),
+                        'analysis': analysis,
+                        'topics': topics,
+                        'details': details
+                    }
+            return {'filename': filename}
+                
+        except Exception as e:
+            logger.error(f"Error getting metadata for {filename}: {str(e)}")
+            return {'filename': filename}
+
     async def search(self, query: str) -> List[Dict]:
         """Search through documents using Gemini"""
         try:
-            # Get list of documents
-            files = await self.gcs.list_files(prefix=DOCUMENTS_PREFIX)
-            doc_files = [Path(f).name for f in files if not f.endswith('_analysis.json')]
-
-            if not doc_files:
+            # Get list of documents from Drive
+            drive_files = await self.drive.list_files()
+            if not drive_files:
                 logger.warning("No documents found to search")
                 return []
 
             # Create temporary files for processing
             temp_files = []
-            for file_path in files:
+            for file in drive_files:
                 try:
-                    if file_path.endswith('_analysis.json'):
-                        continue
-                    content = await self.gcs.download_as_bytes(file_path)
-                    ext = Path(file_path).suffix.lower()
+                    content = await self.drive.download_file(file['id'])
+                    ext = Path(file['name']).suffix.lower()
                     mime_type = self._get_mime_type(ext)
                     
                     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
                         tmp.write(content)
                         tmp.flush()
-                        temp_files.append((tmp.name, Path(file_path).name, mime_type))
+                        temp_files.append((tmp.name, file['name'], mime_type))
                 except Exception as e:
-                    logger.error(f"Error loading file {file_path}: {str(e)}")
+                    logger.error(f"Error loading file {file['name']}: {str(e)}")
                     continue
 
             try:
@@ -190,7 +173,7 @@ class GeminiSearcher:
                         score = float(result.get('score', 0))
                         if cumulative_score + score <= TOP_P_THRESHOLD:
                             # Get metadata including download link
-                            metadata = await self._get_document_metadata(result.get('source', ''), doc_files)
+                            metadata = await self._get_document_metadata(result.get('source', ''), drive_files)
                             
                             formatted_results.append({
                                 'text': result.get('text', ''),

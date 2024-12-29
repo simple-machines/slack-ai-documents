@@ -12,12 +12,12 @@ __version__ = "0.2.0"
 # export commonly used classes
 from .processor import GeminiProcessor
 from .search import GeminiSearcher
-from .storage import GCSHandler
+from .storage import GoogleDriveHandler
 
 __all__ = [
     "GeminiProcessor",
     "GeminiSearcher", 
-    "GCSHandler",
+    "GoogleDriveHandler",
     "api",
     "config",
     "processor",

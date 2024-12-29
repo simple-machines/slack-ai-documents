@@ -8,13 +8,10 @@ import json
 
 from ..config import (
     GEMINI_MODEL,
-    DOCUMENTS_PREFIX,
-    BUCKET_NAME,
-    GEMINI_API_KEY,
     GOOGLE_DRIVE_FOLDER_ID,
-    SERVICE_ACCOUNT_PATH
+    SERVICE_ACCOUNT_PATH,
+    GEMINI_API_KEY
 )
-from ..storage.gcs import GCSHandler
 from ..storage.drive import GoogleDriveHandler
 
 logger = logging.getLogger(__name__)
@@ -28,7 +25,6 @@ class GeminiProcessor:
         # Configure with API key
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(GEMINI_MODEL)
-        self.gcs = GCSHandler(bucket_name=BUCKET_NAME)
         self.drive = GoogleDriveHandler(
             credentials_path=SERVICE_ACCOUNT_PATH,
             folder_id=GOOGLE_DRIVE_FOLDER_ID
@@ -65,21 +61,11 @@ class GeminiProcessor:
             file_path = Path(file_path)
             mime_type = self._get_mime_type(file_path)
             
-            # Upload to GCS for storage
-            gcs_path = f"{DOCUMENTS_PREFIX}{file_path.name}"
-            await self.gcs.upload_file(str(file_path), gcs_path)
-            
-            # Upload to Google Drive
+            # Read file content
             with open(file_path, 'rb') as f:
                 file_content = f.read()
             
-            drive_result = await self.drive.upload_file(
-                file_content,
-                file_path.name,
-                mime_type
-            )
-            
-            # Upload to Gemini
+            # Upload to Gemini for analysis
             file = genai.upload_file(str(file_path))
             
             # Process with Gemini
@@ -102,26 +88,36 @@ class GeminiProcessor:
                     "details": ""
                 }
             
-            # Combine results
-            result = {
-                'gcs_path': gcs_path,
+            # Prepare metadata including analysis
+            file_metadata = {
+                **(metadata or {}),
+                'mime_type': mime_type,
+                'file_name': file_path.name,
+                'analysis': json.dumps(analysis_result.get('analysis', '')),
+                'topics': json.dumps(analysis_result.get('topics', [])),
+                'details': json.dumps(analysis_result.get('details', ''))
+            }
+            
+            # Upload to Drive with metadata
+            drive_result = await self.drive.upload_file(
+                file_content,
+                file_path.name,
+                mime_type,
+                metadata=file_metadata
+            )
+            
+            # Return combined results
+            return {
                 'drive_link': drive_result['web_link'],
+                'file_id': drive_result['file_id'],
                 'analysis': analysis_result.get('analysis', ''),
                 'topics': analysis_result.get('topics', []),
                 'details': analysis_result.get('details', ''),
                 'metadata': {
-                    **(metadata or {}),
-                    'mime_type': mime_type,
-                    'file_name': file_path.name,
+                    **file_metadata,
                     'download_link': drive_result['web_link']
                 }
             }
-            
-            # Store results in GCS
-            results_path = f"{DOCUMENTS_PREFIX}analysis/{file_path.stem}_analysis.json"
-            await self.gcs.upload_json(result, results_path)
-            
-            return result
             
         except Exception as e:
             logger.error(f"Error processing document {file_path}: {str(e)}", exc_info=True)
