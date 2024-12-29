@@ -5,7 +5,6 @@ from typing import Dict, Any, Optional
 import logging
 from pathlib import Path
 import json
-import base64
 
 from ..config import (
     GEMINI_MODEL,
