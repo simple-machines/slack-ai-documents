@@ -3,6 +3,9 @@ google-cloud-aiplatform==1.36.0
 google-cloud-storage==2.10.0
 google-generativeai>=0.3.0
 google-genai
+google-api-python-client==2.108.0
+google-auth-httplib2==0.1.1
+google-auth-oauthlib==1.1.0
 
 # fastapi and web
 fastapi==0.103.1

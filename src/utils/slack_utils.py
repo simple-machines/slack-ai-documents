@@ -16,7 +16,7 @@ from ..config import (
 logger = logging.getLogger(__name__)
 
 async def verify_slack_request(request: Request) -> bool:
-    """verify request is coming from Slack using signing secret"""
+    """Verify request is coming from Slack using signing secret"""
     if not SLACK_SIGNING_SECRET:
         raise HTTPException(status_code=500, detail="Slack signing secret not configured")
 
@@ -24,14 +24,14 @@ async def verify_slack_request(request: Request) -> bool:
     slack_timestamp = request.headers.get("X-Slack-Request-Timestamp", "")
 
     if abs(time.time() - float(slack_timestamp)) > 60 * 5:
-        raise HTTPException(status_code=403, detail="request too old")
+        raise HTTPException(status_code=403, detail="Request too old")
 
     body = await request.body()
     sig_basestring = f"v0:{slack_timestamp}:{body.decode()}"
     my_signature = f"v0={hmac.new(SLACK_SIGNING_SECRET.encode(), sig_basestring.encode(), hashlib.sha256).hexdigest()}"
 
     if not hmac.compare_digest(my_signature, slack_signature):
-        raise HTTPException(status_code=403, detail="invalid signature")
+        raise HTTPException(status_code=403, detail="Invalid signature")
 
     return True
 
@@ -54,23 +54,24 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"🧠 results for: {query}"
+                "text": f"🧠 Results for: {query}"
             }
         }
     ]
 
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
-        explanation = result['metadata'].get('relevance_explanation', 'no explanation provided')
-        text = result['text']  # full text passage
+        explanation = result['metadata'].get('relevance_explanation', 'No explanation provided')
+        text = result['text']
         score = result['score']
         metadata = result['metadata']
+        download_link = metadata.get('download_link', '')
 
         result_block = [
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"*result {i} (score: {score:.2f})*\n*explanation:* {explanation}\n*passage:* {text}"
+                    "text": f"*Result {i} (Score: {score:.2f})*\n*Explanation:* {explanation}\n*Passage:* {text}"
                 }
             },
             {
@@ -78,14 +79,33 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                 "elements": [
                     {
                         "type": "mrkdwn",
-                        "text": f"*source:* {metadata.get('filename', 'Unknown')}"
+                        "text": f"*Source:* {metadata.get('filename', 'Unknown')}"
                     }
                 ]
-            },
-            {
-                "type": "divider"
             }
         ]
+
+        # Add download button if link is available
+        if download_link:
+            result_block.append({
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {
+                            "type": "plain_text",
+                            "text": "📥 Download Document"
+                        },
+                        "url": download_link,
+                        "action_id": f"download_doc_{i}"
+                    }
+                ]
+            })
+
+        result_block.append({
+            "type": "divider"
+        })
+        
         blocks.extend(result_block)
 
     return {
@@ -95,7 +115,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     }
 
 def extract_query(text: str, bot_user_id: str = None) -> str:
-    """extract query from message text, removing bot mention if present"""
+    """Extract query from message text, removing bot mention if present"""
     if bot_user_id and f"<@{bot_user_id}>" in text:
         return text.split(f"<@{bot_user_id}>")[1].strip()
     return text.strip()

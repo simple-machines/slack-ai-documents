@@ -5,6 +5,8 @@ export BUCKET_NAME=semantcai-slack-ai-document-search
 export SLACK_BOT_TOKEN=xoxb-8082366857367-8212695584051-p2grHtBQCMwhxSFYZM2BPHLV
 export SLACK_SIGNING_SECRET=650ed9fcc0f1611c5371cc361fc7b283
 export GEMINI_API_KEY=AIzaSyC7e5FrNHBYUoI1_GDioVYQZkxTp06jSWE
+export GOOGLE_DRIVE_FOLDER_ID=1Dg49mPT-Y9JdSEKrBUcamoWnD1Azy63u
+export GOOGLE_APPLICATION_CREDENTIALS=/service-account-key.json
 
 # enable apis
 gcloud services enable run.googleapis.com artifactregistry.googleapis.com \
