@@ -20,25 +20,67 @@ logger = logging.getLogger(__name__)
 
 class GeminiSearcher:
     def __init__(self):
-        """initialize Gemini searcher"""
+        """Initialize Gemini searcher"""
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY environment variable not set")
 
-        # configure with API key
+        # Configure with API key
         genai.configure(api_key=GEMINI_API_KEY)
         self.model = genai.GenerativeModel(GEMINI_MODEL)
         self.gcs = GCSHandler(bucket_name=BUCKET_NAME)
+        
+    async def _get_actual_filename(self, doc_files: List[str], source: str) -> str:
+        """Match the source name to actual file in GCS bucket"""
+        # If the source matches exactly, return it
+        if source in doc_files:
+            return source
+            
+        # Clean up source name and try to match
+        source_clean = source.lower().replace(" ", "_")
+        for file in doc_files:
+            if file.lower().endswith('.pdf'):
+                return file
+                
+        # If no match found, return original source
+        return source
+
+    async def _get_document_metadata(self, filename: str, doc_files: List[str]) -> Dict[str, Any]:
+        """Get document metadata including download link from analysis file"""
+        try:
+            # Get actual filename from GCS
+            actual_filename = await self._get_actual_filename(doc_files, filename)
+            logger.info(f"Matched source '{filename}' to actual file '{actual_filename}'")
+            
+            # Try to get the analysis file if it exists
+            try:
+                analysis_path = f"{DOCUMENTS_PREFIX}analysis/{Path(actual_filename).stem}_analysis.json"
+                metadata = await self.gcs.download_json(analysis_path)
+                return {
+                    'filename': filename,  # Keep original name for display
+                    'actual_filename': actual_filename,  # Store actual filename
+                    'download_link': metadata.get('drive_link', ''),
+                    'mime_type': metadata.get('metadata', {}).get('mime_type', '')
+                }
+            except Exception as analysis_error:
+                logger.info(f"Analysis file not found for {actual_filename}, using basic metadata")
+                return {
+                    'filename': filename,
+                    'actual_filename': actual_filename,
+                    'download_link': '',
+                    'mime_type': self._get_mime_type(Path(actual_filename).suffix)
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting metadata for {filename}: {str(e)}")
+            return {'filename': filename}
 
     def _clean_json_response(self, text: str) -> str:
-        """clean the response text to get valid JSON"""
-        # remove markdown code block markers
+        """Clean the response text to get valid JSON"""
         text = text.replace('```json', '').replace('```', '')
-        # remove leading/trailing whitespace
-        text = text.strip()
-        return text
+        return text.strip()
 
     def _get_mime_type(self, ext: str) -> str:
-        """determine mime type based on file extension"""
+        """Determine mime type based on file extension"""
         mime_types = {
             '.pdf': 'application/pdf',
             '.txt': 'text/plain',
@@ -53,24 +95,26 @@ class GeminiSearcher:
         }
         mime_type = mime_types.get(ext.lower())
         if not mime_type:
-            mime_type = 'text/plain'  # default to text/plain if unknown
+            mime_type = 'text/plain'
         return mime_type
 
     async def search(self, query: str) -> List[Dict]:
-        """search through documents using Gemini"""
+        """Search through documents using Gemini"""
         try:
-            # get list of documents
+            # Get list of documents
             files = await self.gcs.list_files(prefix=DOCUMENTS_PREFIX)
-            doc_files = [f for f in files if not f.endswith('_analysis.json')]
+            doc_files = [Path(f).name for f in files if not f.endswith('_analysis.json')]
 
             if not doc_files:
                 logger.warning("No documents found to search")
                 return []
 
-            # create temporary files for processing
+            # Create temporary files for processing
             temp_files = []
-            for file_path in doc_files:
+            for file_path in files:
                 try:
+                    if file_path.endswith('_analysis.json'):
+                        continue
                     content = await self.gcs.download_as_bytes(file_path)
                     ext = Path(file_path).suffix.lower()
                     mime_type = self._get_mime_type(ext)
@@ -80,17 +124,17 @@ class GeminiSearcher:
                         tmp.flush()
                         temp_files.append((tmp.name, Path(file_path).name, mime_type))
                 except Exception as e:
-                    logger.error(f"error loading file {file_path}: {str(e)}")
+                    logger.error(f"Error loading file {file_path}: {str(e)}")
                     continue
 
             try:
-                # create temporary file for query
+                # Create temporary file for query
                 with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as temp:
                     temp_path = temp.name
                     temp.write(query)
                     temp.flush()
 
-                # upload files to Gemini
+                # Upload files to Gemini
                 query_file = genai.upload_file(temp_path, mime_type='text/plain')
                 
                 gemini_files = []
@@ -98,7 +142,7 @@ class GeminiSearcher:
                     file = genai.upload_file(temp_path, mime_type=mime_type)
                     gemini_files.append((file, original_name))
 
-                # enhanced search prompt
+                # Enhanced search prompt
                 prompt = f"""
                 Search Query: {query}
 
@@ -121,10 +165,9 @@ class GeminiSearcher:
                 Return as a JSON array containing ALL relevant results.
                 """
 
-                # generate search results
+                # Generate search results
                 content_parts = [file for file, _ in gemini_files]
                 content_parts.append(prompt)
-
                 response = self.model.generate_content(content_parts)
 
                 try:
@@ -132,30 +175,28 @@ class GeminiSearcher:
                     results = json.loads(cleaned_response)
 
                     if not isinstance(results, list):
-                        logger.error(f"unexpected response format: {response.text}")
+                        logger.error(f"Unexpected response format: {response.text}")
                         return []
 
-                    # log raw results
-                    logger.info(f"Raw Gemini results with scores: {[res.get('score') for res in results]}")
-
-                    # filter results by individual score >= 0.90
+                    # Filter results by individual score >= 0.90
                     filtered_results = [result for result in results if result.get('score', 0) >= 0.90]
-                    logger.info(f"Filtered Gemini results (score >= 0.90): {[res.get('score') for res in filtered_results]}")
-
-                    # format results and apply top_p logic with cumulative threshold
+                    
+                    # Format results and apply top_p logic with cumulative threshold
                     formatted_results = []
                     cumulative_score = 0.0
                     
-                    # sort by score in descending order
+                    # Sort by score in descending order
                     for result in sorted(filtered_results, key=lambda x: x.get('score', 0), reverse=True):
                         score = float(result.get('score', 0))
                         if cumulative_score + score <= TOP_P_THRESHOLD:
+                            # Get metadata including download link
+                            metadata = await self._get_document_metadata(result.get('source', ''), doc_files)
+                            
                             formatted_results.append({
                                 'text': result.get('text', ''),
                                 'score': score,
                                 'metadata': {
-                                    'filename': result.get('source', ''),
-                                    'page': result.get('page', 1),
+                                    **metadata,
                                     'relevance_explanation': result.get('explanation', '')
                                 }
                             })
@@ -166,20 +207,25 @@ class GeminiSearcher:
                     return formatted_results
 
                 except json.JSONDecodeError as e:
-                    logger.error(f"failed to parse Gemini response: {response.text}")
+                    logger.error(f"Failed to parse Gemini response: {response.text}")
                     logger.error(f"JSON parse error: {str(e)}")
                     return []
 
             finally:
-                # clean up temporary files
-                if Path(temp_path).exists():
-                    Path(temp_path).unlink()
+                # Clean up temporary files
+                try:
+                    if Path(temp_path).exists():
+                        Path(temp_path).unlink()
+                except Exception as e:
+                    logger.error(f"Error cleaning up query temp file: {str(e)}")
+                
                 for temp_path, _, _ in temp_files:
                     try:
-                        Path(temp_path).unlink()
+                        if Path(temp_path).exists():
+                            Path(temp_path).unlink()
                     except Exception as e:
-                        logger.error(f"error cleaning up temp file {temp_path}: {str(e)}")
+                        logger.error(f"Error cleaning up temp file {temp_path}: {str(e)}")
 
         except Exception as e:
-            logger.error(f"search error: {str(e)}", exc_info=True)
+            logger.error(f"Search error: {str(e)}", exc_info=True)
             raise

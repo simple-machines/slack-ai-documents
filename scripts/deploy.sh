@@ -27,6 +27,11 @@ if [ -z "$SLACK_SIGNING_SECRET" ]; then
   exit 1
 fi
 
+if [ -z "$GOOGLE_DRIVE_FOLDER_ID" ]; then
+  echo "error: GOOGLE_DRIVE_FOLDER_ID environment variable is not set"
+  exit 1
+fi
+
 # create a buildx builder if it doesn't exist
 if ! docker buildx ls | grep -q "cloudrun-builder"; then
     docker buildx create --name cloudrun-builder --use
@@ -58,8 +63,10 @@ gcloud run deploy document-search \
 BUCKET_NAME=${BUCKET_NAME},\
 LOCATION=${LOCATION},\
 SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN},\
-SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET}, \
-GEMINI_API_KEY=${GEMINI_API_KEY}" \
+SLACK_SIGNING_SECRET=${SLACK_SIGNING_SECRET},\
+GEMINI_API_KEY=${GEMINI_API_KEY},\
+GOOGLE_DRIVE_FOLDER_ID=${GOOGLE_DRIVE_FOLDER_ID},\
+GOOGLE_APPLICATION_CREDENTIALS=/tmp/keys/service-account-key.json" \
   --service-account=document-search-sa@${PROJECT_ID}.iam.gserviceaccount.com \
   --cpu-boost \
   --execution-environment=gen2
@@ -83,6 +90,9 @@ if [ $? -eq 0 ]; then
     echo "   - app_mentions:read"
     echo "   - chat:write"
     echo "   - commands"
+    echo "5. Verify Google Drive folder access:"
+    echo "   - Folder ID: ${GOOGLE_DRIVE_FOLDER_ID}"
+    echo "   - Service account has write access to the folder"
 else
     echo "❌ deployment failed!"
     echo "fetching logs..."

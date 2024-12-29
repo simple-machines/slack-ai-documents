@@ -19,13 +19,11 @@ COPY requirements.txt setup.py ./
 RUN pip install --no-cache-dir -r requirements.txt
 RUN pip install -e .
 
+# Copy service account key
+COPY service-account-key.json /tmp/keys/service-account-key.json
+
 # Copy application code
 COPY . .
-
-# Environment variables
-ENV PORT=8080
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app
 
 # Create non-root user and set permissions
 RUN useradd -m myuser && \
