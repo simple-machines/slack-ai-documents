@@ -59,9 +59,17 @@ class GeminiSearcher:
     async def _get_document_metadata(self, filename: str, drive_files: List[Dict]) -> Dict[str, Any]:
         """Get document metadata from Drive files list"""
         try:
+            logger.info(f"Searching for metadata for file: {filename}")
+            logger.info(f"Available drive files: {[f.get('name') for f in drive_files]}")
+            
             # Find the file in drive_files
             for file in drive_files:
-                if file['name'] == filename:
+                logger.info(f"Checking file: {file.get('name')} against {filename}")
+                # Try both exact match and case-insensitive match
+                if file['name'] == filename or file['name'].lower() == filename.lower():
+                    logger.info(f"Found matching file: {file['name']}")
+                    logger.info(f"File data: {json.dumps(file, indent=2)}")
+                    
                     properties = file.get('properties', {})
                     # Parse stored JSON properties
                     try:
@@ -70,8 +78,8 @@ class GeminiSearcher:
                         details = json.loads(properties.get('details', '""'))
                     except json.JSONDecodeError:
                         analysis, topics, details = "", [], ""
-                        
-                    return {
+                    
+                    metadata = {
                         'filename': filename,
                         'download_link': file.get('webViewLink', ''),
                         'mime_type': file.get('mimeType', ''),
@@ -79,10 +87,15 @@ class GeminiSearcher:
                         'topics': topics,
                         'details': details
                     }
+                    logger.info(f"Returning metadata: {json.dumps(metadata, indent=2)}")
+                    return metadata
+                    
+            logger.warning(f"No matching file found for: {filename}")
             return {'filename': filename}
                 
         except Exception as e:
             logger.error(f"Error getting metadata for {filename}: {str(e)}")
+            logger.error(f"Drive files data: {json.dumps(drive_files, indent=2)}")
             return {'filename': filename}
 
     async def search(self, query: str) -> List[Dict]:
@@ -93,6 +106,10 @@ class GeminiSearcher:
             if not drive_files:
                 logger.warning("No documents found to search")
                 return []
+
+            # Log found files
+            logger.info(f"Found {len(drive_files)} files in Drive")
+            logger.info(f"Files: {[f.get('name') for f in drive_files]}")
 
             # Create temporary files for processing
             temp_files = []
@@ -106,6 +123,7 @@ class GeminiSearcher:
                         tmp.write(content)
                         tmp.flush()
                         temp_files.append((tmp.name, file['name'], mime_type))
+                        logger.info(f"Successfully created temp file for {file['name']}")
                 except Exception as e:
                     logger.error(f"Error loading file {file['name']}: {str(e)}")
                     continue
@@ -156,6 +174,7 @@ class GeminiSearcher:
                 try:
                     cleaned_response = self._clean_json_response(response.text)
                     results = json.loads(cleaned_response)
+                    logger.info(f"Raw Gemini response: {json.dumps(results, indent=2)}")
 
                     if not isinstance(results, list):
                         logger.error(f"Unexpected response format: {response.text}")
@@ -163,6 +182,7 @@ class GeminiSearcher:
 
                     # Filter results by individual score >= 0.90
                     filtered_results = [result for result in results if result.get('score', 0) >= 0.90]
+                    logger.info(f"Filtered results: {json.dumps(filtered_results, indent=2)}")
                     
                     # Format results and apply top_p logic with cumulative threshold
                     formatted_results = []
@@ -172,21 +192,29 @@ class GeminiSearcher:
                     for result in sorted(filtered_results, key=lambda x: x.get('score', 0), reverse=True):
                         score = float(result.get('score', 0))
                         if cumulative_score + score <= TOP_P_THRESHOLD:
-                            # Get metadata including download link
-                            metadata = await self._get_document_metadata(result.get('source', ''), drive_files)
+                            source_name = result.get('source', '')
+                            logger.info(f"Getting metadata for source: {source_name}")
                             
-                            formatted_results.append({
+                            # Get metadata including download link
+                            metadata = await self._get_document_metadata(source_name, drive_files)
+                            logger.info(f"Retrieved metadata: {json.dumps(metadata, indent=2)}")
+                            
+                            formatted_result = {
                                 'text': result.get('text', ''),
                                 'score': score,
                                 'metadata': {
                                     **metadata,
                                     'relevance_explanation': result.get('explanation', '')
                                 }
-                            })
+                            }
+                            logger.info(f"Formatted result: {json.dumps(formatted_result, indent=2)}")
+                            
+                            formatted_results.append(formatted_result)
                             cumulative_score += score
                         else:
                             break
 
+                    logger.info(f"Final formatted results: {json.dumps(formatted_results, indent=2)}")
                     return formatted_results
 
                 except json.JSONDecodeError as e:

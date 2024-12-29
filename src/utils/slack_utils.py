@@ -51,11 +51,12 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             }]
         }
 
-    # Create the text version for notifications/screen readers
+    # create the text version for notifications/screen readers
     text_content = f"Search Results for: {query}\n"
     for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
-        text_content += f"\nResult {i} (Score: {result['score']:.2f})\n"
-        text_content += f"Source: {result['metadata'].get('filename', 'Unknown')}\n"
+        # text_content += f"\nresult {i} (score: {result['score']:.2f})\n"
+        text_content += f"\nresult {i}\n"
+        text_content += f"source: {result['metadata'].get('filename', 'Unknown')}\n"
         text_content += f"{result['text']}\n"
 
     blocks = [
@@ -63,7 +64,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"🧠 Results for: {query}"
+                "text": f"🧠 results for: {query}"
             }
         }
     ]
@@ -76,7 +77,8 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
         download_link = metadata.get('download_link', '')
 
         # create the main text block
-        main_text = f"*result {i} (Score: {score:.2f})*\n"
+        main_text = f"*RESULT {i} (score: {score:.2f})*\n"
+        # main_text = f"*result {i}*\n"
         main_text += f"*source:* {metadata.get('filename', 'Unknown')}\n"
         main_text += f"*passage:* {text}\n"
         main_text += f"*explanation:* {explanation}\n"
