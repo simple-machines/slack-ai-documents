@@ -53,16 +53,20 @@ gcloud iam service-accounts keys create service-account-key.json \
 ```
 
 # artifact registry setup
+```
 gcloud artifacts repositories create document-search \
     --repository-format=docker \
     --location=$LOCATION \
     --description="Document Search Service Repository"
 
 gcloud auth configure-docker ${LOCATION}-docker.pkg.dev
+```
 
 # deploy
+```
 chmod +x scripts/deploy.sh
 ./scripts/deploy.sh
+```
 
 # verify
 SERVICE_URL=$(gcloud run services describe document-search --platform managed --region $LOCATION --format 'value(status.url)')
