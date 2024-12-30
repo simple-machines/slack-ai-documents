@@ -89,46 +89,34 @@ class GeminiSearcher:
         try:
             logger.info(f"Searching for metadata for file: {filename}")
             
-            # Create a map of filenames to drive files for easier lookup
-            file_map = {file['name']: file for file in drive_files}
-            logger.info(f"Available files: {list(file_map.keys())}")
-
-            # Try to find the file by name
-            if filename in file_map:
-                file = file_map[filename]
-            else:
-                # If exact match not found, try to match by title in metadata
-                for drive_file in drive_files:
-                    properties = drive_file.get('properties', {})
-                    if properties.get('title', '').lower() == filename.lower():
-                        file = drive_file
-                        break
-                else:
-                    logger.warning(f"No matching file found for: {filename}")
-                    return {'filename': filename}
-
-            logger.info(f"Found matching file: {file['name']}")
-            properties = file.get('properties', {})
+            # Since we only have one file for now, and we know it's the handbook
+            if drive_files and len(drive_files) > 0:
+                file = drive_files[0]  # Get the first (and only) file
+                logger.info(f"Using file: {file.get('name')}")
+                
+                properties = file.get('properties', {})
+                # Parse stored JSON properties
+                try:
+                    analysis = json.loads(properties.get('analysis', '""'))
+                    topics = json.loads(properties.get('topics', '[]'))
+                    details = json.loads(properties.get('details', '""'))
+                except json.JSONDecodeError:
+                    analysis, topics, details = "", [], ""
+                
+                metadata = {
+                    'filename': filename,  # Keep original name for display
+                    'actual_filename': file['name'],
+                    'download_link': file.get('webViewLink', ''),
+                    'mime_type': file.get('mimeType', ''),
+                    'analysis': analysis,
+                    'topics': topics,
+                    'details': details
+                }
+                logger.info(f"Returning metadata with download link: {metadata.get('download_link')}")
+                return metadata
             
-            # Parse stored JSON properties
-            try:
-                analysis = json.loads(properties.get('analysis', '""'))
-                topics = json.loads(properties.get('topics', '[]'))
-                details = json.loads(properties.get('details', '""'))
-            except json.JSONDecodeError:
-                analysis, topics, details = "", [], ""
-            
-            metadata = {
-                'filename': filename,
-                'actual_filename': file['name'],
-                'download_link': file.get('webViewLink', ''),
-                'mime_type': file.get('mimeType', ''),
-                'analysis': analysis,
-                'topics': topics,
-                'details': details
-            }
-            logger.info(f"Returning metadata: {json.dumps(metadata, indent=2)}")
-            return metadata
+            logger.warning(f"No files found in Drive")
+            return {'filename': filename}
                 
         except Exception as e:
             logger.error(f"Error getting metadata for {filename}: {str(e)}")
