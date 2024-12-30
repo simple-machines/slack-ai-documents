@@ -15,6 +15,47 @@ from ..config import (
 
 logger = logging.getLogger(__name__)
 
+def group_results_by_source(results: List[Dict]) -> List[Dict]:
+    """Group search results by their source document"""
+    grouped = {}
+    
+    for result in results:
+        source = result['metadata'].get('filename', 'Unknown')
+        if source not in grouped:
+            grouped[source] = {
+                'source': source,
+                'passages': [],
+                'scores': [],
+                'explanations': [],
+                'metadata': result['metadata']
+            }
+        
+        grouped[source]['passages'].append(result['text'])
+        grouped[source]['scores'].append(result['score'])
+        grouped[source]['explanations'].append(
+            result['metadata'].get('relevance_explanation', '')
+        )
+    
+    # Convert to list and format each group
+    formatted_results = []
+    for source_data in grouped.values():
+        # Combine explanations
+        combined_explanation = "Based on these passages: " + \
+                             " Additionally, ".join(source_data['explanations'])
+        
+        # Get highest score
+        max_score = max(source_data['scores'])
+        
+        formatted_results.append({
+            'source': source_data['source'],
+            'passages': source_data['passages'],
+            'score': max_score,
+            'explanation': combined_explanation,
+            'metadata': source_data['metadata']
+        })
+    
+    return formatted_results
+
 async def verify_slack_request(request: Request) -> bool:
     """Verify request is coming from Slack using signing secret"""
     if not SLACK_SIGNING_SECRET:
@@ -51,37 +92,35 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             }]
         }
 
-    # create the text version for notifications/screen readers
+    # Group results by source
+    grouped_results = group_results_by_source(results)
+
+    # Create the text version for notifications/screen readers
     text_content = f"Search Results for: {query}\n"
-    for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
-        # text_content += f"\nresult {i} (score: {result['score']:.2f})\n"
-        text_content += f"\nresult {i}\n"
-        text_content += f"source: {result['metadata'].get('filename', 'Unknown')}\n"
-        text_content += f"{result['text']}\n"
+    for result in grouped_results:
+        text_content += f"\nSource: {result['source']}\n"
+        for i, passage in enumerate(result['passages'], 1):
+            text_content += f"Passage {i}: {passage}\n"
 
     blocks = [
         {
             "type": "header",
             "text": {
                 "type": "plain_text",
-                "text": f"🧠 results for: {query}"
+                "text": f"🧠 Results for: {query}"
             }
         }
     ]
 
-    for i, result in enumerate(results[:SLACK_MAX_RESULTS], 1):
-        explanation = result['metadata'].get('relevance_explanation', 'No explanation provided')
-        text = result['text']
-        score = result['score']
-        metadata = result['metadata']
-        download_link = metadata.get('download_link', '')
+    for result in grouped_results:
+        # Format passages
+        passages_text = ""
+        for i, passage in enumerate(result['passages'], 1):
+            passages_text += f"*Passage {i}:* {passage}\n\n"
 
-        # create the main text block
-        main_text = f"*RESULT {i} (score: {score:.2f})*\n"
-        # main_text = f"*result {i}*\n"
-        main_text += f"*source:* {metadata.get('filename', 'Unknown')}\n"
-        main_text += f"*passage:* {text}\n"
-        main_text += f"*explanation:* {explanation}\n"
+        main_text = f"*Source:* {result['source']}\n\n"
+        main_text += passages_text
+        main_text += f"*Explanation:* {result['explanation']}\n"
 
         result_block = [
             {
@@ -93,15 +132,9 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             }
         ]
 
-        # add download button if link is available
+        # Add download button if link is available
+        download_link = result['metadata'].get('download_link', '')
         if download_link:
-            result_block.append({
-                "type": "section",
-                "text": {
-                    "type": "mrkdwn",
-                    "text": "*document link:* " + download_link
-                }
-            })
             result_block.append({
                 "type": "actions",
                 "elements": [
@@ -109,11 +142,11 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
                         "type": "button",
                         "text": {
                             "type": "plain_text",
-                            "text": "📥 download document",
+                            "text": "📥 Download Document",
                             "emoji": True
                         },
                         "url": download_link,
-                        "action_id": f"download_doc_{i}"
+                        "action_id": f"download_doc_{result['source']}"
                     }
                 ]
             })
@@ -127,12 +160,12 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     return {
         "response_type": "in_channel",
         "thread_ts": thread_ts,
-        "text": text_content,  # add plain text version for notifications
+        "text": text_content,
         "blocks": blocks
     }
 
 def extract_query(text: str, bot_user_id: str = None) -> str:
-    """extract query from message text, removing bot mention if present"""
+    """Extract query from message text, removing bot mention if present"""
     if bot_user_id and f"<@{bot_user_id}>" in text:
         return text.split(f"<@{bot_user_id}>")[1].strip()
     return text.strip()

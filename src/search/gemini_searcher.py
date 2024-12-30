@@ -1,5 +1,3 @@
-# src/search/gemini_searcher.py
-
 import google.generativeai as genai
 from typing import List, Dict, Any
 import logging
@@ -34,8 +32,38 @@ class GeminiSearcher:
 
     def _clean_json_response(self, text: str) -> str:
         """Clean the response text to get valid JSON"""
-        text = text.replace('```json', '').replace('```', '')
-        return text.strip()
+        try:
+            # Remove markdown code block syntax
+            text = text.replace('```json', '').replace('```', '')
+            
+            # Replace literal \n with spaces but preserve real newlines
+            text = text.replace('\\n', ' ')
+            
+            # Remove any control characters
+            text = ''.join(char for char in text if ord(char) >= 32 or char in '\n\r\t')
+            
+            # Properly escape any remaining special characters
+            text = json.dumps(text)[1:-1]  # Remove the quotes added by dumps
+            
+            # Now it's safe to parse back into a string
+            text = text.strip()
+            
+            logger.debug(f"Cleaned JSON text: {text}")
+            
+            return text
+        except Exception as e:
+            logger.error(f"Error in first cleaning pass: {str(e)}")
+            try:
+                # Fallback cleaning method
+                text = text.replace('\n', ' ')
+                text = text.replace('\\', '\\\\')
+                text = text.replace('"', '\\"')
+                text = text.strip()
+                return text
+            except Exception as e2:
+                logger.error(f"Error in fallback cleaning: {str(e2)}")
+                # Last resort: remove all problematic characters
+                return ''.join(c for c in text if c.isprintable())
 
     def _get_mime_type(self, ext: str) -> str:
         """Determine mime type based on file extension"""
@@ -61,37 +89,46 @@ class GeminiSearcher:
         try:
             logger.info(f"Searching for metadata for file: {filename}")
             
-            # Store the source name from Gemini for display
-            display_name = filename
+            # Create a map of filenames to drive files for easier lookup
+            file_map = {file['name']: file for file in drive_files}
+            logger.info(f"Available files: {list(file_map.keys())}")
+
+            # Try to find the file by name
+            if filename in file_map:
+                file = file_map[filename]
+            else:
+                # If exact match not found, try to match by title in metadata
+                for drive_file in drive_files:
+                    properties = drive_file.get('properties', {})
+                    if properties.get('title', '').lower() == filename.lower():
+                        file = drive_file
+                        break
+                else:
+                    logger.warning(f"No matching file found for: {filename}")
+                    return {'filename': filename}
+
+            logger.info(f"Found matching file: {file['name']}")
+            properties = file.get('properties', {})
             
-            # Check if any file in drive_files matches our search results
-            # Get the first and only file since we know it's the one we're searching
-            if drive_files and len(drive_files) > 0:
-                file = drive_files[0]  # We only have one file in the Drive folder
-                logger.info(f"Using file: {file.get('name')}")
-                
-                properties = file.get('properties', {})
-                # Parse stored JSON properties
-                try:
-                    analysis = json.loads(properties.get('analysis', '""'))
-                    topics = json.loads(properties.get('topics', '[]'))
-                    details = json.loads(properties.get('details', '""'))
-                except json.JSONDecodeError:
-                    analysis, topics, details = "", [], ""
-                
-                metadata = {
-                    'filename': display_name,  # Keep original name for display
-                    'download_link': file.get('webViewLink', ''),  # Use the actual file's link
-                    'mime_type': file.get('mimeType', ''),
-                    'analysis': analysis,
-                    'topics': topics,
-                    'details': details
-                }
-                logger.info(f"Returning metadata: {json.dumps(metadata, indent=2)}")
-                return metadata
-                    
-            logger.warning(f"No files found in Drive")
-            return {'filename': display_name}
+            # Parse stored JSON properties
+            try:
+                analysis = json.loads(properties.get('analysis', '""'))
+                topics = json.loads(properties.get('topics', '[]'))
+                details = json.loads(properties.get('details', '""'))
+            except json.JSONDecodeError:
+                analysis, topics, details = "", [], ""
+            
+            metadata = {
+                'filename': filename,
+                'actual_filename': file['name'],
+                'download_link': file.get('webViewLink', ''),
+                'mime_type': file.get('mimeType', ''),
+                'analysis': analysis,
+                'topics': topics,
+                'details': details
+            }
+            logger.info(f"Returning metadata: {json.dumps(metadata, indent=2)}")
+            return metadata
                 
         except Exception as e:
             logger.error(f"Error getting metadata for {filename}: {str(e)}")
@@ -106,7 +143,6 @@ class GeminiSearcher:
                 logger.warning("No documents found to search")
                 return []
 
-            # Log found files
             logger.info(f"Found {len(drive_files)} files in Drive")
             logger.info(f"Files: {[f.get('name') for f in drive_files]}")
 
@@ -148,19 +184,20 @@ class GeminiSearcher:
 
                 Search through the provided documents and find ALL relevant passages that answer or relate to the query.
                 Be thorough - if multiple different sections contain relevant information, include them all.
+                When referencing a source, always use the exact filename of the document.
                 
                 For each relevant passage found, provide:
                 1. The complete text passage that contains the answer (preserve full context)
                 2. A relevance score between 0 and 1 (be precise in scoring - if multiple passages are equally relevant, give them the same score)
                 3. A detailed explanation of how this passage relates to or answers the query
-                4. The source document name
+                4. The source document name (using the exact filename)
 
                 Return ALL passages that are highly relevant (don't limit to just the best match).
                 Format each result as a JSON object with these exact keys:
                 - text: the complete relevant passage
                 - score: a float between 0 and 1
                 - explanation: detailed explanation of relevance
-                - source: the document name
+                - source: the document filename
 
                 Return as a JSON array containing ALL relevant results.
                 """
@@ -171,9 +208,31 @@ class GeminiSearcher:
                 response = self.model.generate_content(content_parts)
 
                 try:
+                    # Log raw response for debugging
+                    logger.debug(f"Raw response from Gemini: {response.text}")
+                    
+                    # First cleaning pass
                     cleaned_response = self._clean_json_response(response.text)
-                    results = json.loads(cleaned_response)
-                    logger.info(f"Raw Gemini response: {json.dumps(results, indent=2)}")
+                    
+                    try:
+                        results = json.loads(cleaned_response)
+                    except json.JSONDecodeError as je:
+                        logger.error(f"First JSON parse attempt failed: {str(je)}")
+                        # Try parsing line by line
+                        lines = response.text.split('\n')
+                        json_text = []
+                        in_json = False
+                        
+                        for line in lines:
+                            if '[' in line:
+                                in_json = True
+                            if in_json:
+                                json_text.append(line)
+                            if ']' in line:
+                                break
+                                
+                        cleaned_response = '\n'.join(json_text)
+                        results = json.loads(cleaned_response)
 
                     if not isinstance(results, list):
                         logger.error(f"Unexpected response format: {response.text}")
