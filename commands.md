@@ -1,11 +1,17 @@
 # core setup
-export PROJECT_ID=semantcai
+export PROJECT_ID=sm-dev-447100
 export LOCATION=us-central1
-export SLACK_BOT_TOKEN=xoxb-8082366857367-8212695584051-p2grHtBQCMwhxSFYZM2BPHLV
+export SLACK_BOT_TOKEN=xoxb-2679250116-8252314024645-QVVrwwn8uO1oxyUzTs2jMgxL
 export SLACK_SIGNING_SECRET=650ed9fcc0f1611c5371cc361fc7b283
-export GEMINI_API_KEY=AIzaSyC7e5FrNHBYUoI1_GDioVYQZkxTp06jSWE
+export GEMINI_API_KEY=AIzaSyA5-gIm4fFoPZ0Dm99Cy_-OfCFrU_fG8fM
 export GOOGLE_DRIVE_FOLDER_ID=1Dg49mPT-Y9JdSEKrBUcamoWnD1Azy63u
 export GOOGLE_APPLICATION_CREDENTIALS=/service-account-key.json
+
+```
+gcloud auth login
+gcloud config set project sm-dev-447100
+```
+
 
 # enable apis
 ```
@@ -16,16 +22,14 @@ gcloud services enable drive.googleapis.com
 ```
 
 # organization policy setup
-gcloud organizations add-iam-policy-binding 923362929465 \
-    --member='user:info@semantc.com' \
+```
+gcloud organizations add-iam-policy-binding 123... \
+    --member='user:' \
     --role='roles/orgpolicy.policyAdmin'
 
 gcloud resource-manager org-policies disable-enforce iam.disableServiceAccountKeyCreation \
-    --organization=923362929465
-
-# storage setup
-gsutil mb -l us-central1 gs://$BUCKET_NAME
-gsutil uniformbucketlevelaccess set on gs://$BUCKET_NAME
+    --organization=123...
+```
 
 # service account setup
 ```
@@ -34,19 +38,11 @@ gcloud iam service-accounts create document-search-sa \
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:document-search-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/storage.admin"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:document-search-sa@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/aiplatform.user"
 
 gcloud projects add-iam-policy-binding $PROJECT_ID \
     --member="serviceAccount:document-search-sa@$PROJECT_ID.iam.gserviceaccount.com" \
     --role="roles/run.invoker"
-
-gcloud projects add-iam-policy-binding $PROJECT_ID \
-    --member="serviceAccount:document-search-sa@$PROJECT_ID.iam.gserviceaccount.com" \
-    --role="roles/drive.admin"
 
 gcloud iam service-accounts keys create service-account-key.json \
     --iam-account=document-search-sa@$PROJECT_ID.iam.gserviceaccount.com
