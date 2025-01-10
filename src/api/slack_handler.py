@@ -125,7 +125,7 @@ class SlackHandler:
                 # respond immediately to slack
                 response = {
                     "response_type": "ephemeral",
-                    "text": "searching for results... please wait 🧑‍💻"
+                    "text": "searching for results... please wait 🧑‍💻 it will take a little while but not long"
                 }
 
                 # process search asynchronously

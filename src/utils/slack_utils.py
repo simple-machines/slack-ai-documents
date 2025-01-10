@@ -104,10 +104,10 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
 
     blocks = [
         {
-            "type": "header",
+            "type": "section",
             "text": {
                 "type": "plain_text",
-                "text": f"🧠 Results for: {query}"
+                "text": f"🧠 *Results For: {query}*"
             }
         }
     ]

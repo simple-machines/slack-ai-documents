@@ -230,7 +230,7 @@ class GeminiSearcher:
 
                     # Filter results by individual score >= 0.90
                     filtered_results = [result for result in results if result.get('score', 0) >= 0.90]
-                    logger.info(f"Filtered results: {json.dumps(filtered_results, indent=2)}")
+                    # logger.info(f"Filtered results: {json.dumps(filtered_results, indent=2)}") # UNCOMMENT THIS TO SEE ALL CONSIDERED OPTIONS!!!
                     
                     # Format results and apply top_p logic with cumulative threshold
                     formatted_results = []
@@ -245,7 +245,7 @@ class GeminiSearcher:
                             
                             # Get metadata including download link
                             metadata = await self._get_document_metadata(source_name, drive_files)
-                            logger.info(f"Retrieved metadata: {json.dumps(metadata, indent=2)}")
+                            # logger.info(f"Retrieved metadata: {json.dumps(metadata, indent=2)}")
                             
                             formatted_result = {
                                 'text': result.get('text', ''),
@@ -262,7 +262,7 @@ class GeminiSearcher:
                         else:
                             break
 
-                    logger.info(f"Final formatted results: {json.dumps(formatted_results, indent=2)}")
+                    # logger.info(f"Final formatted results: {json.dumps(formatted_results, indent=2)}")
                     return formatted_results
 
                 except json.JSONDecodeError as e:

@@ -12,7 +12,7 @@ GOOGLE_DRIVE_FOLDER_ID = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
 SERVICE_ACCOUNT_PATH = os.getenv("GOOGLE_APPLICATION_CREDENTIALS", "/service-account-key.json")
 
 # Gemini Model Settings
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-1.5-pro-latest"  # "gemini-1.5-flash"
 MAX_OUTPUT_TOKENS = 2048
 TEMPERATURE = 0.2
 

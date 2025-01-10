@@ -58,7 +58,7 @@ gcloud run deploy document-search \
   --allow-unauthenticated \
   --memory=4Gi \
   --cpu=2 \
-  --min-instances=0 \
+  --min-instances=1 \
   --max-instances=10 \
   --timeout=600 \
   --port=8080 \
