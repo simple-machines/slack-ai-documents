@@ -115,17 +115,25 @@ class SlackHandler:
             })
 
             if command == "/find":
+                # Check if text is empty
                 if not text:
-                    response = {
+                    return {
                         "response_type": "ephemeral",
-                        "text": "please provide a search query! Usage: `/find your query here`"
+                        "text": "Please provide a search query! Usage: `/find [how to apply for leave]`"
                     }
-                    return response
+                
+                # Check text length and word count
+                word_count = len(text.split())
+                if len(text) < 10 or word_count < 2:
+                    return {
+                        "response_type": "ephemeral",
+                        "text": "Your query is too short. Please provide at least 2 words. For example: `/find [how to apply for leave]`"
+                    }
 
                 # respond immediately to slack
                 response = {
                     "response_type": "ephemeral",
-                    "text": "searching for results... please wait 🧑‍💻 it will take a little while but not long"
+                    "text": "searching for results... please wait a minute 🧑‍💻"
                 }
 
                 # process search asynchronously

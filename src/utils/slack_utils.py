@@ -106,8 +106,8 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
         {
             "type": "section",
             "text": {
-                "type": "plain_text",
-                "text": f"🧠 *Results For: {query}*"
+                "type": "mrkdwn",
+                "text": f"*🧠 RESULTS FOR: {query}*"
             }
         }
     ]
@@ -120,7 +120,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
 
         main_text = f"*Source:* {result['source']}\n\n"
         main_text += passages_text
-        main_text += f"*Explanation:* {result['explanation']}\n"
+        main_text += f"*Explanation:* _{result['explanation']}_\n"
 
         result_block = [
             {
