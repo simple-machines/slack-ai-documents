@@ -98,16 +98,16 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
     # Create the text version for notifications/screen readers
     text_content = f"Search Results for: {query}\n"
     for result in grouped_results:
-        text_content += f"\nSource: {result['source']}\n"
+        text_content += f"\nsource: {result['source']}\n"
         for i, passage in enumerate(result['passages'], 1):
-            text_content += f"Passage {i}: {passage}\n"
+            text_content += f"passage {i}: {passage}\n"
 
     blocks = [
         {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f"*🧠 RESULTS FOR: {query}*"
+                "text": f":stableparrot: *results for:* _{query}_"
             }
         }
     ]
@@ -116,11 +116,11 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
         # Format passages
         passages_text = ""
         for i, passage in enumerate(result['passages'], 1):
-            passages_text += f"*Passage {i}:* {passage}\n\n"
+            passages_text += f"*passage {i}:* {passage}\n\n"
 
-        main_text = f"*Source:* {result['source']}\n\n"
+        main_text = f"*source:* {result['source']}\n\n"
         main_text += passages_text
-        main_text += f"*Explanation:* _{result['explanation']}_\n"
+        main_text += f"*explanation:* _{result['explanation']}_\n"
 
         result_block = [
             {
