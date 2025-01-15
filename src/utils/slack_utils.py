@@ -107,7 +107,7 @@ async def format_search_results(results: List[Dict], query: str, summary: str, t
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": f":stableparrot: *results for:* _{query}_"
+                "text": f"🖨️ *results for:* _{query}_"
             }
         }
     ]

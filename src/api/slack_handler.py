@@ -53,7 +53,7 @@ class SlackHandler:
                     processing_msg = {
                         "channel": channel_id,
                         "thread_ts": thread_ts,
-                        "text": "🖨️ processing your request..."
+                        "text": "📡 processing your request..."
                     }
                     # Remove await - WebClient is not async
                     client.chat_postMessage(**processing_msg)
