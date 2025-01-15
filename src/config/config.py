@@ -28,3 +28,5 @@ SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
 SLACK_MAX_RESULTS = 5
 SLACK_RESULT_CHUNK_SIZE = 1000
 SLACK_RATE_LIMIT = 20
+
+SYSTEM_INSTRUCTION = "You are an expert at analyzing documents and providing detailed insights."
