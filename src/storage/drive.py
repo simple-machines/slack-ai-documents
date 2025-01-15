@@ -9,6 +9,9 @@ import json
 import logging
 from pathlib import Path
 import time
+import random
+import asyncio
+from google.api_core import retry
 
 logger = logging.getLogger(__name__)
 
@@ -24,13 +27,20 @@ class GoogleDriveHandler:
                     'https://www.googleapis.com/auth/drive.metadata'
                 ]
             )
-            self.service = build('drive', 'v3', credentials=self.credentials)
+            
+            # Initialize service
+            self.service = build(
+                'drive', 
+                'v3', 
+                credentials=self.credentials,
+                cache_discovery=False,
+            )
             self.folder_id = folder_id
             
             # Share folder with service account if folder_id is provided
             if self.folder_id:
                 self._ensure_folder_access()
-            
+                
         except Exception as e:
             logger.error(f"Failed to initialize Google Drive client: {str(e)}")
             raise
@@ -79,18 +89,7 @@ class GoogleDriveHandler:
             raise
 
     async def upload_file(self, file_content: bytes, filename: str, mime_type: str, metadata: Optional[Dict] = None) -> Dict[str, str]:
-        """
-        Upload a file to Google Drive and return file details
-        
-        Args:
-            file_content: File content as bytes
-            filename: Name of the file
-            mime_type: MIME type of the file
-            metadata: Optional metadata to store with the file
-            
-        Returns:
-            Dict containing file ID and shareable link
-        """
+        """Upload a file to Google Drive and return file details"""
         try:
             # Prepare the file metadata
             file_metadata = {
@@ -103,16 +102,20 @@ class GoogleDriveHandler:
             fh = io.BytesIO(file_content)
             media = MediaIoBaseUpload(fh, mime_type, resumable=True)
 
-            # Upload the file with retry logic
-            max_retries = 3
+            # Upload the file with enhanced retry logic
+            max_retries = 5
             retry_count = 0
+            backoff_factor = 1.5
             last_error = None
             
             while retry_count < max_retries:
                 try:
                     logger.info(f"Attempting to upload file {filename} (attempt {retry_count + 1}/{max_retries})")
                     
-                    file = self.service.files().create(
+                    # Create new service instance for each attempt
+                    service = build('drive', 'v3', credentials=self.credentials, cache_discovery=False)
+                    
+                    file = service.files().create(
                         body=file_metadata,
                         media_body=media,
                         fields='id, webViewLink, properties',
@@ -125,7 +128,7 @@ class GoogleDriveHandler:
                         'role': 'reader'
                     }
                     
-                    self.service.permissions().create(
+                    service.permissions().create(
                         fileId=file['id'],
                         body=permission,
                         fields='id'
@@ -139,14 +142,21 @@ class GoogleDriveHandler:
                         'properties': file.get('properties', {})
                     }
                     
-                except HttpError as e:
+                except (HttpError, BrokenPipeError, ConnectionError) as e:
                     retry_count += 1
                     last_error = e
                     
                     if retry_count < max_retries:
-                        wait_time = 2 ** retry_count
-                        logger.warning(f"Upload attempt {retry_count} failed. Retrying in {wait_time} seconds...")
-                        time.sleep(wait_time)
+                        wait_time = (backoff_factor ** retry_count) + random.uniform(0, 1)
+                        logger.warning(f"Upload attempt {retry_count} failed. Retrying in {wait_time:.2f} seconds...")
+                        
+                        # Close any existing connections
+                        try:
+                            service.close()
+                        except:
+                            pass
+                            
+                        await asyncio.sleep(wait_time)
                     else:
                         logger.error(f"Failed to upload after {max_retries} attempts")
                         raise last_error
@@ -155,47 +165,17 @@ class GoogleDriveHandler:
             logger.error(f"Failed to upload file to Google Drive: {str(e)}")
             raise
 
-    async def download_file(self, file_id: str) -> bytes:
-        """Download a file from Google Drive"""
-        try:
-            max_retries = 3
-            retry_count = 0
-            
-            while retry_count < max_retries:
-                try:
-                    request = self.service.files().get_media(fileId=file_id)
-                    fh = io.BytesIO()
-                    downloader = MediaIoBaseDownload(fh, request)
-                    
-                    done = False
-                    while done is False:
-                        status, done = downloader.next_chunk()
-                        logger.debug(f"Download progress: {int(status.progress() * 100)}%")
-                        
-                    return fh.getvalue()
-                
-                except HttpError as e:
-                    retry_count += 1
-                    if retry_count == max_retries:
-                        raise
-                    wait_time = 2 ** retry_count
-                    logger.warning(f"Download attempt {retry_count} failed. Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-            
-        except Exception as e:
-            logger.error(f"Failed to download file from Drive: {str(e)}")
-            raise
-
     async def list_files(self, query: Optional[str] = None) -> List[Dict[str, Any]]:
-        """List files in the specified folder"""
+        """List files in the specified folder with enhanced retry handling"""
         try:
             # Build the query
             base_query = f"'{self.folder_id}' in parents" if self.folder_id else None
             final_query = f"{base_query} and {query}" if query else base_query
             
-            # Get files with retry logic
-            max_retries = 3
+            # Get files with enhanced retry logic
+            max_retries = 5
             retry_count = 0
+            backoff_factor = 1.5
             
             while retry_count < max_retries:
                 try:
@@ -203,7 +183,10 @@ class GoogleDriveHandler:
                     page_token = None
                     
                     while True:
-                        response = self.service.files().list(
+                        # Create new service instance for each attempt
+                        service = build('drive', 'v3', credentials=self.credentials, cache_discovery=False)
+                        
+                        response = service.files().list(
                             q=final_query,
                             spaces='drive',
                             fields='nextPageToken, files(id, name, mimeType, webViewLink, properties)',
@@ -219,90 +202,174 @@ class GoogleDriveHandler:
                     
                     return results
                     
-                except HttpError as e:
+                except (HttpError, BrokenPipeError, ConnectionError) as e:
                     retry_count += 1
                     if retry_count == max_retries:
+                        logger.error(f"Failed all retries for list_files: {str(e)}")
                         raise
-                    wait_time = 2 ** retry_count
-                    logger.warning(f"List files attempt {retry_count} failed. Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
+                    
+                    wait_time = (backoff_factor ** retry_count) + random.uniform(0, 1)
+                    logger.warning(f"List files attempt {retry_count} failed. Retrying in {wait_time:.2f} seconds... Error: {str(e)}")
+                    
+                    # Close any existing connections
+                    try:
+                        service.close()
+                    except:
+                        pass
+                        
+                    await asyncio.sleep(wait_time)
             
         except Exception as e:
-            logger.error(f"Failed to list files in Drive: {str(e)}")
+            logger.error(f"Failed to list files in Drive: {str(e)}", exc_info=True)
             raise
 
-    async def update_metadata(self, file_id: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
-        """Update file metadata"""
+    async def download_file(self, file_id: str) -> bytes:
+        """Download a file from Google Drive with enhanced retry handling"""
         try:
-            max_retries = 3
+            max_retries = 5
             retry_count = 0
+            backoff_factor = 1.5
             
             while retry_count < max_retries:
                 try:
+                    # Create new service instance for each attempt
+                    service = build('drive', 'v3', credentials=self.credentials, cache_discovery=False)
+                    
+                    request = service.files().get_media(fileId=file_id)
+                    fh = io.BytesIO()
+                    downloader = MediaIoBaseDownload(fh, request)
+                    
+                    done = False
+                    while done is False:
+                        status, done = downloader.next_chunk()
+                        logger.debug(f"Download progress: {int(status.progress() * 100)}%")
+                        
+                    return fh.getvalue()
+                
+                except (HttpError, BrokenPipeError, ConnectionError) as e:
+                    retry_count += 1
+                    if retry_count == max_retries:
+                        raise
+                    wait_time = (backoff_factor ** retry_count) + random.uniform(0, 1)
+                    logger.warning(f"Download attempt {retry_count} failed. Retrying in {wait_time:.2f} seconds...")
+                    
+                    # Close any existing connections
+                    try:
+                        service.close()
+                    except:
+                        pass
+                        
+                    await asyncio.sleep(wait_time)
+            
+        except Exception as e:
+            logger.error(f"Failed to download file from Drive: {str(e)}")
+            raise
+
+    async def update_metadata(self, file_id: str, metadata: Dict[str, Any]) -> Dict[str, Any]:
+        """Update file metadata with enhanced retry handling"""
+        try:
+            max_retries = 5
+            retry_count = 0
+            backoff_factor = 1.5
+            
+            while retry_count < max_retries:
+                try:
+                    # Create new service instance for each attempt
+                    service = build('drive', 'v3', credentials=self.credentials, cache_discovery=False)
+                    
                     file_metadata = {'properties': metadata}
-                    updated_file = self.service.files().update(
+                    updated_file = service.files().update(
                         fileId=file_id,
                         body=file_metadata,
                         fields='id, properties'
                     ).execute()
                     return updated_file.get('properties', {})
                 
-                except HttpError as e:
+                except (HttpError, BrokenPipeError, ConnectionError) as e:
                     retry_count += 1
                     if retry_count == max_retries:
                         raise
-                    wait_time = 2 ** retry_count
-                    logger.warning(f"Update metadata attempt {retry_count} failed. Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
+                    wait_time = (backoff_factor ** retry_count) + random.uniform(0, 1)
+                    logger.warning(f"Update metadata attempt {retry_count} failed. Retrying in {wait_time:.2f} seconds...")
+                    
+                    # Close any existing connections
+                    try:
+                        service.close()
+                    except:
+                        pass
+                        
+                    await asyncio.sleep(wait_time)
             
         except Exception as e:
             logger.error(f"Failed to update metadata: {str(e)}")
             raise
 
     async def get_metadata(self, file_id: str) -> Dict[str, Any]:
-        """Get file metadata"""
+        """Get file metadata with enhanced retry handling"""
         try:
-            max_retries = 3
+            max_retries = 5
             retry_count = 0
+            backoff_factor = 1.5
             
             while retry_count < max_retries:
                 try:
-                    file = self.service.files().get(
+                    # Create new service instance for each attempt
+                    service = build('drive', 'v3', credentials=self.credentials, cache_discovery=False)
+                    
+                    file = service.files().get(
                         fileId=file_id,
                         fields='properties'
                     ).execute()
                     return file.get('properties', {})
                 
-                except HttpError as e:
+                except (HttpError, BrokenPipeError, ConnectionError) as e:
                     retry_count += 1
                     if retry_count == max_retries:
                         raise
-                    wait_time = 2 ** retry_count
-                    logger.warning(f"Get metadata attempt {retry_count} failed. Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
+                    wait_time = (backoff_factor ** retry_count) + random.uniform(0, 1)
+                    logger.warning(f"Get metadata attempt {retry_count} failed. Retrying in {wait_time:.2f} seconds...")
+                    
+                    # Close any existing connections
+                    try:
+                        service.close()
+                    except:
+                        pass
+                        
+                    await asyncio.sleep(wait_time)
             
         except Exception as e:
             logger.error(f"Failed to get metadata: {str(e)}")
             raise
 
     async def delete_file(self, file_id: str) -> bool:
-        """Delete a file from Google Drive"""
+        """Delete a file from Google Drive with enhanced retry handling"""
         try:
-            max_retries = 3
+            max_retries = 5
             retry_count = 0
+            backoff_factor = 1.5
             
             while retry_count < max_retries:
                 try:
-                    self.service.files().delete(fileId=file_id).execute()
+                    # Create new service instance for each attempt
+                    service = build('drive', 'v3', credentials=self.credentials, cache_discovery=False)
+                    
+                    service.files().delete(fileId=file_id).execute()
                     return True
                 
-                except HttpError as e:
+                except (HttpError, BrokenPipeError, ConnectionError) as e:
                     retry_count += 1
                     if retry_count == max_retries:
                         raise
-                    wait_time = 2 ** retry_count
-                    logger.warning(f"Delete attempt {retry_count} failed. Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
+                    wait_time = (backoff_factor ** retry_count) + random.uniform(0, 1)
+                    logger.warning(f"Delete attempt {retry_count} failed. Retrying in {wait_time:.2f} seconds...")
+                    
+                    # Close any existing connections
+                    try:
+                        service.close()
+                    except:
+                        pass
+                        
+                    await asyncio.sleep(wait_time)
                     
             return False
             
